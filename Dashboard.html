@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>KPI Dashboard</title>
+  
+  <!-- CSS Dependencies -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- JS Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- เพิ่มไลบรารี html2pdf สำหรับโหลด PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  
+  <style>
+    :root { 
+        --ci-primary: #31C1D7; 
+        --ci-bg: #F8F9FA; 
+        --ci-text: #2d3436; 
+    }
+    body { 
+        font-family: 'Sarabun', sans-serif; 
+        background-color: var(--ci-bg); 
+        color: var(--ci-text); 
+        font-size: 0.95rem;
+    }
+    
+    /* Cards */
+    .kpi-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        height: 100%;
+        border: 1px solid #eef2f5;
+        transition: transform 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-5px); }
+    
+    .kpi-icon {
+        width: 50px; height: 50px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; margin-bottom: 15px;
+    }
+    
+    .kpi-value { font-size: 1.8rem; font-weight: 800; color: #2d3436; }
+    .kpi-label { color: #64748b; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 5px; }
+    
+    /* Chart Container */
+    .chart-container { 
+        background: #fff; 
+        border-radius: 16px; 
+        padding: 25px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        border: 1px solid #eef2f5; 
+        margin-bottom: 20px; 
+        height: auto; 
+    }
+    .h-100-custom { height: 100%; }
+
+    /* Table */
+    .table-custom th { 
+        background-color: #f8fafc; 
+        color: #64748b; 
+        font-weight: 700; 
+        text-transform: uppercase; 
+        font-size: 0.85rem; 
+    }
+    
+    .progress-thin { height: 6px; border-radius: 3px; background-color: #e2e8f0; }
+    .tooltip-icon { cursor: pointer; color: #94a3b8; }
+    .tooltip-icon:hover { color: var(--ci-primary); }
+
+    #topicChart { cursor: pointer; }
+    
+    /* PDF Report Styles */
+    .pdf-header { border-bottom: 2px solid var(--ci-primary); padding-bottom: 10px; margin-bottom: 20px; }
+  </style>
+</head>
+<body class="p-4">
+
+  <div class="container-fluid max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-secondary mb-1">
+                <i class="fas fa-chart-line me-2 text-primary"></i>Dashboard & KPI
+            </h3>
+            <p class="text-muted small mb-0">วิเคราะห์ประสิทธิภาพการดำเนินงานและการตอบสนองรายบุคคล</p>
+        </div>
+        <button class="btn btn-outline-secondary fw-bold rounded-pill px-4 shadow-sm" onclick="window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>?page=case'">
+            <i class="fas fa-arrow-left me-2"></i> กลับหน้าเคส
+        </button>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="card mb-4 border-0 shadow-sm">
+      <div class="card-body d-flex flex-wrap gap-3 align-items-center bg-white rounded-3 py-3">
+         <div class="d-flex align-items-center gap-2">
+            <label class="fw-bold text-secondary mb-0"><i class="fas fa-eye me-1"></i>มุมมอง:</label>
+            <select id="viewMode" class="form-select shadow-sm" style="width:auto;" onchange="toggleViewMode()">
+                <option value="month">📅 รายเดือน</option>
+                <option value="day">📆 รายวัน</option>
+            </select>
+         </div>
+
+         <div class="vr mx-2"></div>
+         <label class="fw-bold text-secondary mb-0"><i class="fas fa-filter me-2 text-primary"></i>ตัวกรอง:</label>
+         
+         <div id="divMonthPicker">
+             <select id="filterMonth" class="form-select shadow-sm" style="width: auto; min-width: 150px;" onchange="loadDashboardData()">
+                <option value="all">📅 ทุกเดือน</option>
+             </select>
+         </div>
+
+         <div id="divDatePicker" class="d-none">
+             <input type="date" id="filterDate" class="form-control shadow-sm" onchange="loadDashboardData()">
+         </div>
+         
+         <select id="filterAssignee" class="form-select shadow-sm" style="width: auto; min-width: 200px;" onchange="loadDashboardData()">
+            <option value="all">👤 เจ้าหน้าที่ทุกคน</option>
+         </select>
+         
+         <div class="ms-auto d-flex gap-2">
+             <!-- Global AI Button -->
+             <button class="btn btn-warning btn-sm rounded-pill fw-bold shadow-sm" onclick="triggerGlobalAIAnalysis()" id="btnGlobalAI" style="display: none;">
+                <i class="fas fa-magic text-dark me-1"></i> วิเคราะห์ภาพรวมเจาะลึก (AI)
+             </button>
+             <button class="btn btn-light border btn-sm rounded-pill" onclick="resetFilters()" title="รีเซ็ตและรีเฟรช">
+                <i class="fas fa-sync-alt"></i>
+             </button>
+         </div>
+      </div>
+    </div>
+
+    <!-- Row 1: Graphs (Topic + Hourly/Comp) -->
+    <div class="row g-4 mb-4">
+        <!-- Topic Chart -->
+        <div class="col-md-5">
+            <div class="chart-container h-100-custom">
+                <h5 class="fw-bold text-secondary mb-3"><i class="fas fa-chart-pie me-2"></i>สัดส่วนหัวข้อ (Case Topics)</h5>
+                <div style="height: 250px; position: relative;">
+                    <canvas id="topicChart"></canvas>
+                </div>
+                <div id="topicHint" class="text-center small text-muted mt-2 d-none">
+                   <i class="fas fa-hand-pointer me-1"></i> คลิกที่กราฟเพื่อดูรายชื่อเคส
+                </div>
+            </div>
+        </div>
+
+        <!-- Dynamic Chart (Hourly or Comparison) -->
+        <div class="col-md-7">
+            <div id="hourlyContainer" class="chart-container d-none">
+                <h5 class="fw-bold text-secondary mb-3"><i class="fas fa-clock me-2"></i>ปริมาณงานรายชั่วโมง (Hourly Analysis)</h5>
+                <div style="height: 250px; position: relative;"><canvas id="hourlyChart"></canvas></div>
+            </div>
+
+            <div id="comparisonContainer" class="chart-container d-none">
+                <h5 class="fw-bold text-secondary mb-3"><i class="fas fa-balance-scale me-2"></i>เปรียบเทียบผลงาน (<span id="compLabelRef"></span> vs <span id="compLabelSelected"></span>)</h5>
+                <div style="height: 250px; position: relative;">
+                    <canvas id="compChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards Section -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="kpi-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="kpi-label mb-2">
+                            เวลาเฉลี่ย: เปิดเคส ➝ รับเคส 
+                            <i class="fas fa-info-circle tooltip-icon" data-bs-toggle="tooltip" title="เวลารับงาน - เวลาเปิดเคส (Response Time)"></i>
+                        </div>
+                        <div class="kpi-value text-warning" id="statOpenAccept">...</div>
+                        <div class="small text-muted mt-2">ความไวในการตอบสนองคำขอ</div>
+                    </div>
+                    <div class="kpi-icon bg-warning bg-opacity-10 text-warning">
+                        <i class="fas fa-stopwatch"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="kpi-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="kpi-label mb-2">
+                            เวลาเฉลี่ย: รับเคส ➝ ปิดเคส 
+                            <i class="fas fa-info-circle tooltip-icon" data-bs-toggle="tooltip" title="เวลาปิดงาน - เวลารับงาน (Resolution Time)"></i>
+                        </div>
+                        <div class="kpi-value text-success" id="statAcceptClose">...</div>
+                        <div class="small text-muted mt-2">ความรวดเร็วในการจัดการปัญหา</div>
+                    </div>
+                    <div class="kpi-icon bg-success bg-opacity-10 text-success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Performance Table -->
+    <div class="chart-container h-100-custom">
+        <h5 class="fw-bold text-secondary mb-4"><i class="fas fa-users me-2"></i>สถิติรายบุคคล (Team Performance)</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle table-custom">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">เจ้าหน้าที่</th>
+                        <th class="text-center">งานทั้งหมด</th>
+                        <th>ความคืบหน้า (ปิด / ทั้งหมด)</th>
+                        <th class="text-center text-info">ปิดงานเฉลี่ย <i class="fas fa-info-circle tooltip-icon" data-bs-toggle="tooltip" title="เวลาเฉลี่ยตั้งแต่เริ่มเปิดเคสจนปิดเคสสำเร็จ (ของพนักงานคนนั้น)"></i></th>
+                        <th class="text-center text-warning">กำลังทำ</th>
+                        <th class="text-center text-danger">รอดำเนินการ</th>
+                    </tr>
+                </thead>
+                <tbody id="teamTableBody">
+                    <tr><td colspan="6" class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i>กำลังรวบรวมข้อมูล...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+  </div>
+
+  <!-- Modal Topic Detail -->
+  <div class="modal fade" id="topicModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="topicModalTitle"></h5>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-warning fw-bold shadow-sm" id="btnAnalyzeAI" style="display: none;" onclick="triggerTopicAIAnalysis()">
+                        <i class="fas fa-magic text-dark me-1"></i> วิเคราะห์ด้วย AI
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light fw-bold shadow-sm" id="btnExportTopic" style="display: none;" onclick="exportTopicToCSV()">
+                        <i class="fas fa-file-excel text-success me-1"></i> Export Excel
+                    </button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4" style="width: 80px;">เวลา</th>
+                                <th style="width: 250px;">รหัส / หัวข้อย่อย</th>
+                                <th>แม่บ้าน</th>
+                                <th>การดำเนินการล่าสุด</th>
+                                <th>ผู้รับผิดชอบ</th>
+                                <th class="text-end pe-4" style="width: 100px;">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topicModalBody">
+                            <!-- JS fill -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- NEW Modal: AI Result (Pop-up สำหรับโหลด PDF) -->
+  <div class="modal fade" id="aiResultModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-robot me-2"></i>AI Insight Analysis
+                </h5>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-light fw-bold shadow-sm" id="btnDownloadPDF" onclick="downloadAIPDF()" style="display: none;">
+                        <i class="fas fa-file-pdf text-danger me-1"></i> โหลดเป็น PDF
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body p-4 bg-light" id="pdfContentArea">
+                <!-- ส่วนหัวรายงาน (จะโชว์เฉพาะใน PDF หรือตอนสรุปผลเสร็จ) -->
+                <div class="pdf-header text-center d-none" id="pdfReportHeader">
+                    <h4 class="fw-bold text-primary mb-1">รายงานวิเคราะห์คุณภาพการให้บริการ</h4>
+                    <p class="text-muted small mb-0" id="pdfReportDate">วันที่วิเคราะห์: -</p>
+                </div>
+                
+                <!-- ข้อความสรุปจาก AI (เอา white-space: pre-wrap ออก และเพิ่ม word-break) -->
+                <div id="aiResultTextPopup" class="text-dark" style="line-height: 1.6; font-size: 1.05rem; word-break: break-word;"></div>
+                
+                <!-- ลายเซ็นต์ท้ายรายงาน -->
+                <div class="mt-4 pt-3 border-top text-end text-muted small d-none" id="pdfReportFooter">
+                    <i>วิเคราะห์และสรุปผลโดย Gemini AI Assistant</i>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let comparisonChart = null;
+    let hourlyChart = null;
+    let topicChart = null; 
+    let topicModal = null;
+    let aiResultModal = null; // New Modal
+    
+    // Global variables for export & AI
+    let currentTopicData = []; 
+    let currentTopicNameForExport = "";
+    let currentDashboardStats = null; 
+    let currentFilteredCases = []; 
+    let currentReportTitleForPDF = "AI_Analysis_Report"; // ชื่อไฟล์ PDF เริ่มต้น
+
+    /**
+     * Sanitization Helper
+     */
+    function h(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
+    }
+
+    window.onload = function() {
+        toggleViewMode(); 
+        initTooltips();
+        topicModal = new bootstrap.Modal(document.getElementById('topicModal'));
+        aiResultModal = new bootstrap.Modal(document.getElementById('aiResultModal'));
+    };
+
+    function initTooltips() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (t) { return new bootstrap.Tooltip(t); });
+    }
+
+    function toggleViewMode() {
+        const mode = document.getElementById('viewMode').value;
+        const divMonth = document.getElementById('divMonthPicker');
+        const divDate = document.getElementById('divDatePicker');
+        const hourlyContainer = document.getElementById('hourlyContainer');
+        const compContainer = document.getElementById('comparisonContainer');
+        const topicHint = document.getElementById('topicHint');
+        
+        if (mode === 'month') {
+            divMonth.classList.remove('d-none');
+            divDate.classList.add('d-none');
+            hourlyContainer.classList.add('d-none');
+            compContainer.classList.remove('d-none');
+            topicHint.classList.add('d-none');
+        } else {
+            divMonth.classList.add('d-none');
+            divDate.classList.remove('d-none');
+            if(!document.getElementById('filterDate').value) {
+                document.getElementById('filterDate').valueAsDate = new Date();
+            }
+            hourlyContainer.classList.remove('d-none');
+            compContainer.classList.remove('d-none');
+            topicHint.classList.remove('d-none');
+        }
+        loadDashboardData();
+    }
+
+    function loadDashboardData() {
+        const mode = document.getElementById('viewMode').value;
+        const assignee = document.getElementById('filterAssignee').value;
+        let value = (mode === 'month') ? document.getElementById('filterMonth').value : document.getElementById('filterDate').value;
+
+        document.getElementById('teamTableBody').innerHTML = `<tr><td colspan="6" class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>กำลังคำนวณสถิติ...</td></tr>`;
+        document.getElementById('statOpenAccept').innerHTML = '<span class="fs-4 text-muted">...</span>';
+        document.getElementById('statAcceptClose').innerHTML = '<span class="fs-4 text-muted">...</span>';
+        document.getElementById('btnGlobalAI').style.display = 'none';
+        
+        google.script.run.withSuccessHandler(renderDashboard).getDashboardStatsAndCases(mode, value, assignee);
+    }
+
+    function renderDashboard(data) {
+        currentDashboardStats = data.stats;
+        currentFilteredCases = data.cases; 
+
+        if (data.stats.topicStats && data.stats.topicStats.length > 0) {
+            document.getElementById('btnGlobalAI').style.display = 'inline-block';
+        }
+
+        document.getElementById('statOpenAccept').textContent = data.stats.avgOpenAccept;
+        document.getElementById('statAcceptClose').textContent = data.stats.avgAcceptClose;
+
+        const mSelect = document.getElementById('filterMonth');
+        if (mSelect.options.length <= 1) {
+            data.stats.filterOptions.months.forEach(m => {
+                const opt = document.createElement('option'); opt.value = m; opt.textContent = m;
+                mSelect.appendChild(opt);
+            });
+        }
+        const aSelect = document.getElementById('filterAssignee');
+        if (aSelect.options.length <= 1) {
+            data.stats.filterOptions.assignees.forEach(a => {
+                const opt = document.createElement('option'); opt.value = a.email; opt.textContent = a.label;
+                aSelect.appendChild(opt);
+            });
+        }
+
+        const tbody = document.getElementById('teamTableBody');
+        tbody.innerHTML = '';
+        
+        if (!data.stats.assigneeStats || data.stats.assigneeStats.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4">ไม่พบข้อมูลตามตัวกรองที่เลือก</td></tr>`;
+        } else {
+            data.stats.assigneeStats.forEach(user => {
+                if (user.email === 'unassigned') return;
+                const closeRate = user.total > 0 ? Math.round((user.closed / user.total) * 100) : 0;
+                let colorClass = 'success';
+                if (closeRate < 50) colorClass = 'danger';
+                else if (closeRate < 70) colorClass = 'warning';
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-dark">${h(user.name)}</div>
+                            <div class="small text-muted text-truncate" style="max-width: 200px;">${h(user.email)}</div>
+                        </td>
+                        <td class="text-center fw-bold fs-5">${user.total}</td>
+                        <td style="min-width: 150px;">
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="fw-bold me-2 text-${colorClass}">${closeRate}%</span>
+                                <span class="small text-muted">(${user.closed} จาก ${user.total})</span>
+                            </div>
+                            <div class="progress progress-thin">
+                                <div class="progress-bar bg-${colorClass}" style="width: ${closeRate}%"></div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border shadow-sm">${h(user.avgTime)}</span>
+                        </td>
+                        <td class="text-center fw-bold text-warning">${user.progress}</td>
+                        <td class="text-center fw-bold text-danger">${user.pending}</td>
+                    </tr>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        renderTopicChart(data.stats.topicStats);
+        renderPerformanceGraph(data.stats.comparisonData, data.stats.refLabel);
+        renderHourlyChart(data.stats.hourlyStats); 
+        initTooltips();
+    }
+
+    // *** Global AI Analysis Function (เรียกใช้ผ่าน Modal Popup) ***
+    function triggerGlobalAIAnalysis() {
+        if (!currentDashboardStats || !currentFilteredCases) return;
+
+        let dataStr = "ข้อมูลสถิติภาพรวมจากการกรองปัจจุบัน:\n";
+        dataStr += `- เวลาตอบรับงานเฉลี่ย: ${currentDashboardStats.avgOpenAccept}\n`;
+        dataStr += `- เวลาปิดงานเฉลี่ย: ${currentDashboardStats.avgAcceptClose}\n\n`;
+        
+        dataStr += "หัวข้อปัญหาที่พบ (เรียงตามจำนวน):\n";
+        if(currentDashboardStats.topicStats && currentDashboardStats.topicStats.length > 0) {
+            currentDashboardStats.topicStats.forEach(t => { dataStr += `- ${t.label}: ${t.count} เคส\n`; });
+        } else { dataStr += "- ไม่มีข้อมูลเคส\n"; }
+
+        dataStr += "\nประสิทธิภาพการทำงานรายบุคคล:\n";
+        if(currentDashboardStats.assigneeStats && currentDashboardStats.assigneeStats.length > 0) {
+            currentDashboardStats.assigneeStats.forEach(a => {
+                dataStr += `- ${a.name}: งานทั้งหมด ${a.total} เคส (รอดำเนินการ ${a.pending}, กำลังทำ ${a.progress}, ปิดสำเร็จ ${a.closed}) | เวลาเฉลี่ยในการปิดงาน: ${a.avgTime}\n`;
+            });
+        } else { dataStr += "- ไม่มีข้อมูลเจ้าหน้าที่\n"; }
+
+        dataStr += "\n\nบันทึก 'การดำเนินการล่าสุด' ของแอดมินทั้งหมดที่พบในช่วงนี้:\n";
+        let casesWithDetails = currentFilteredCases.filter(c => c.actionDetails && c.actionDetails.trim() !== '');
+        
+        if (casesWithDetails.length > 0) {
+            // ดึงข้อมูลไปวิเคราะห์ทั้งหมดไม่จำกัดด้วย slice() 
+            casesWithDetails.forEach((c) => {
+                let subTopicsStr = "ไม่ระบุ";
+                try {
+                    const tObj = JSON.parse(c.topic);
+                    if(tObj && tObj.sub && tObj.sub.length > 0) subTopicsStr = tObj.sub.join(", ");
+                } catch(e) {}
+                // ส่งรหัส [CASE-XXXX] ไปให้ AI เห็นชัดๆ
+                dataStr += `[${c.id}]: ปัญหาย่อย="${subTopicsStr}", สิ่งที่แอดมินพิมพ์="${c.actionDetails}", สถานะ="${c.status}"\n`;
+            });
+        } else { dataStr += "- (ยังไม่มีเจ้าหน้าที่ลงบันทึกใดๆ ในช่วงเวลานี้)\n"; }
+
+        // Setup PDF Title
+        const mode = document.getElementById('viewMode').value;
+        const val = mode === 'month' ? document.getElementById('filterMonth').value : document.getElementById('filterDate').value;
+        currentReportTitleForPDF = `Global_Analysis_${val}`;
+
+        // เตรียมความพร้อม Modal ก่อนโชว์
+        document.getElementById('btnDownloadPDF').style.display = 'none';
+        document.getElementById('pdfReportHeader').classList.add('d-none');
+        document.getElementById('pdfReportFooter').classList.add('d-none');
+        document.getElementById('aiResultTextPopup').innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x mb-3 text-warning"></i><br>Gemini AI กำลังวิเคราะห์สถิติและคุณภาพงานของทีม<br>อาจใช้เวลา 5-10 วินาที...</div>';
+        
+        // Show Modal
+        aiResultModal.show();
+
+        // ฝั่งปุ่มที่กด ให้หมุน Loading ไว้ด้วยเผื่อผู้ใช้ปิด Modal ระหว่างทาง
+        const btn = document.getElementById('btnGlobalAI');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> กำลังวิเคราะห์...';
+
+        google.script.run.withSuccessHandler(res => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic text-dark me-1"></i> วิเคราะห์ภาพรวมเจาะลึก (AI)';
+            
+            if (res.success) {
+                // แปลงสัญลักษณ์ ** เป็นตัวหนา และแปลง \n เป็นแท็ก <br>
+                let formattedText = res.text
+                    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                    .replace(/\n/g, '<br>');
+                document.getElementById('aiResultTextPopup').innerHTML = formattedText;
+                
+                // เซ็ตข้อความให้หน้า Report PDF
+                const todayStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                document.getElementById('pdfReportDate').textContent = `ข้อมูลประจำรอบ: ${val} | เวลาพิมพ์รายงาน: ${todayStr}`;
+                
+                // Show elements for PDF Download
+                document.getElementById('btnDownloadPDF').style.display = 'block';
+                document.getElementById('pdfReportHeader').classList.remove('d-none');
+                document.getElementById('pdfReportFooter').classList.remove('d-none');
+
+            } else {
+                document.getElementById('aiResultTextPopup').innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i><b>เกิดข้อผิดพลาด:</b> ${res.message}</div>`;
+            }
+        }).analyzeCombinedStatsWithAI(dataStr);
+    }
+
+    // *** Topic AI Analysis Function (เรียกใช้ผ่าน Modal Popup) ***
+    function triggerTopicAIAnalysis() {
+        if (!currentTopicData || currentTopicData.length === 0) return;
+
+        let dataStr = `หัวข้อหลักที่กำลังวิเคราะห์: ${currentTopicNameForExport}\n\n`;
+        
+        // ดึงข้อมูลไปวิเคราะห์ทั้งหมดไม่จำกัดด้วย slice()
+        currentTopicData.forEach((r) => { 
+            // ส่งรหัส [CASE-XXXX] ให้เห็นชัดๆ
+            dataStr += `[${r.id}]: ปัญหาย่อย="${r.subTopic}", สิ่งที่จนท.ทำ="${r.lastAction}", สถานะ="${r.status}"\n`;
+        });
+
+        // Setup PDF Title
+        const dateVal = document.getElementById('filterDate').value;
+        const safeTopicName = currentTopicNameForExport.replace(/[/\\?%*:|"<>]/g, '-');
+        currentReportTitleForPDF = `Topic_Analysis_${safeTopicName}_${dateVal}`;
+
+        // เตรียมความพร้อม Modal ก่อนโชว์
+        document.getElementById('btnDownloadPDF').style.display = 'none';
+        document.getElementById('pdfReportHeader').classList.add('d-none');
+        document.getElementById('pdfReportFooter').classList.add('d-none');
+        document.getElementById('aiResultTextPopup').innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x mb-3 text-warning"></i><br>Gemini AI กำลังวิเคราะห์หัวข้อเคสและการตอบสนอง<br>อาจใช้เวลา 5-10 วินาที...</div>';
+        
+        // Show AI Modal (ทับ Topic Modal ไปเลย หรืออยู่ด้านบน)
+        aiResultModal.show();
+
+        const btn = document.getElementById('btnAnalyzeAI');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> กำลังวิเคราะห์...';
+
+        google.script.run.withSuccessHandler(res => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic text-dark me-1"></i> วิเคราะห์ด้วย AI';
+            
+            if (res.success) {
+                // แปลงสัญลักษณ์ ** เป็นตัวหนา และแปลง \n เป็นแท็ก <br>
+                let formattedText = res.text
+                    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                    .replace(/\n/g, '<br>');
+                document.getElementById('aiResultTextPopup').innerHTML = formattedText;
+                
+                // เซ็ตข้อความให้หน้า Report PDF
+                const todayStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                document.getElementById('pdfReportDate').textContent = `หัวข้อ: ${currentTopicNameForExport} | ข้อมูลประจำวันที่: ${dateVal} | เวลาพิมพ์รายงาน: ${todayStr}`;
+                
+                // Show elements for PDF Download
+                document.getElementById('btnDownloadPDF').style.display = 'block';
+                document.getElementById('pdfReportHeader').classList.remove('d-none');
+                document.getElementById('pdfReportFooter').classList.remove('d-none');
+
+            } else {
+                document.getElementById('aiResultTextPopup').innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i><b>เกิดข้อผิดพลาด:</b> ${res.message}</div>`;
+            }
+        }).analyzeTopicCasesWithAI(dataStr);
+    }
+
+    // *** ฟังก์ชันแปลงหน้าจอเป็น PDF (ใหม่!) ***
+    function downloadAIPDF() {
+        const btn = document.getElementById('btnDownloadPDF');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> กำลังสร้างไฟล์...';
+        btn.disabled = true;
+
+        // เป้าหมายคือการวาด element ที่มี id ว่า pdfContentArea
+        const element = document.getElementById('pdfContentArea');
+        
+        // กำหนดตั้งค่าหน้า PDF
+        const opt = {
+            margin:       [0.5, 0.5, 0.5, 0.5], // นิ้ว
+            filename:     `${currentReportTitleForPDF}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true }, // scale ยิ่งเยอะยิ่งชัด แต่ไฟล์ใหญ่ขึ้น
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        // สั่งสร้างและดาวน์โหลดไฟล์
+        html2pdf().set(opt).from(element).save().then(() => {
+            // โหลดเสร็จคืนค่าปุ่มกลับมา
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }).catch(err => {
+            console.error('PDF Generation Error:', err);
+            alert("เกิดข้อผิดพลาดในการสร้างไฟล์ PDF");
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        });
+    }
+
+    function renderTopicChart(topicData) {
+        const ctx = document.getElementById('topicChart').getContext('2d');
+        if (topicChart) topicChart.destroy();
+        
+        if (!topicData || topicData.length === 0) return;
+
+        const labels = topicData.map(t => t.label);
+        const values = topicData.map(t => t.count);
+        const colors = ['#31C1D7', '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#8B5CF6', '#EC4899', '#64748B'];
+
+        topicChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                },
+                cutout: '60%',
+                onClick: (evt, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const label = labels[index];
+                        handleTopicClick(label);
+                    }
+                }
+            }
+        });
+    }
+
+    function handleTopicClick(topicName) {
+        const mode = document.getElementById('viewMode').value;
+        if (mode !== 'day') return; 
+
+        const dateVal = document.getElementById('filterDate').value;
+        
+        currentTopicNameForExport = topicName;
+        document.getElementById('btnExportTopic').style.display = 'none'; 
+        document.getElementById('btnAnalyzeAI').style.display = 'none'; 
+        
+        document.getElementById('topicModalTitle').innerHTML = `<i class="fas fa-tag me-2"></i>${topicName} <span class="small text-light opacity-75">(${dateVal})</span>`;
+        document.getElementById('topicModalBody').innerHTML = `<tr><td colspan="6" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>`;
+        
+        topicModal.show();
+        
+        google.script.run.withSuccessHandler(rows => {
+            currentTopicData = rows || []; 
+            const tbody = document.getElementById('topicModalBody');
+            tbody.innerHTML = '';
+            
+            if (!currentTopicData || currentTopicData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">ไม่พบข้อมูล</td></tr>`;
+                return;
+            }
+            
+            document.getElementById('btnExportTopic').style.display = 'block';
+            document.getElementById('btnAnalyzeAI').style.display = 'block';
+            
+            currentTopicData.forEach(r => {
+                let statusBadge = r.status === 'รอการประสานงาน' ? '<span class="badge bg-danger">รอ</span>' : (r.status === 'กำลังประสานงาน' ? '<span class="badge bg-warning text-dark">กำลังทำ</span>' : '<span class="badge bg-success">ปิด</span>');
+                let subHtml = r.subTopic && r.subTopic !== '-' ? `<div class="text-muted small mt-1"><i class="fas fa-tags me-1" style="font-size:0.7em;"></i>${h(r.subTopic)}</div>` : '';
+                let actionHtml = r.lastAction && r.lastAction !== '-' ? `<div class="text-truncate" style="max-width: 250px;" title="${h(r.lastAction)}">${h(r.lastAction)}</div>` : '<span class="text-muted">-</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="ps-4 fw-bold text-primary">${r.time}</td>
+                        <td>
+                            <div class="fw-bold">${r.id}</div>
+                            ${subHtml}
+                        </td>
+                        <td>${r.maid}</td>
+                        <td class="small text-muted">${actionHtml}</td>
+                        <td class="small text-muted">${r.assignee || '-'}</td>
+                        <td class="text-end pe-4">${statusBadge}</td>
+                    </tr>
+                `;
+            });
+        }).getTopicCases(dateVal, topicName);
+    }
+
+    function exportTopicToCSV() {
+        if (!currentTopicData || currentTopicData.length === 0) return;
+
+        const headers = ["เวลา", "Case ID", "หัวข้อย่อย", "แม่บ้าน", "การดำเนินการล่าสุด", "ผู้รับผิดชอบ", "สถานะ"];
+        const csvRows = [];
+        csvRows.push(headers.join(',')); 
+
+        const escapeCsv = (text) => {
+            let str = String(text || '');
+            str = str.replace(/"/g, '""'); 
+            return `"${str}"`;
+        };
+
+        currentTopicData.forEach(r => {
+            const row = [
+                escapeCsv(r.time),
+                escapeCsv(r.id),
+                escapeCsv(r.subTopic),
+                escapeCsv(r.maid),
+                escapeCsv(r.lastAction),
+                escapeCsv(r.assignee),
+                escapeCsv(r.status)
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvString = '\uFEFF' + csvRows.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        const dateStr = document.getElementById('filterDate').value || 'All';
+        const safeTopicName = currentTopicNameForExport.replace(/[/\\?%*:|"<>]/g, '-'); 
+        link.download = `Report_${safeTopicName}_${dateStr}.csv`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function renderHourlyChart(hourlyData) {
+        const container = document.getElementById('hourlyContainer');
+        const mode = document.getElementById('viewMode').value;
+        
+        if (mode !== 'day' || !hourlyData) {
+            container.classList.add('d-none');
+            return;
+        }
+        
+        container.classList.remove('d-none');
+        const ctx = document.getElementById('hourlyChart').getContext('2d');
+        if (hourlyChart) hourlyChart.destroy();
+
+        hourlyChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: hourlyData.map(h => h.hour),
+                datasets: [
+                    {
+                        type: 'line',
+                        label: 'เวลาตอบกลับเฉลี่ย (นาที)',
+                        data: hourlyData.map(h => h.avgResponse),
+                        borderColor: '#FF9F43',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                        pointRadius: 3
+                    },
+                    {
+                        type: 'bar',
+                        label: 'จำนวนเคสที่เข้ามา',
+                        data: hourlyData.map(h => h.count),
+                        backgroundColor: 'rgba(49, 193, 215, 0.6)',
+                        borderColor: 'rgba(49, 193, 215, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        position: 'left',
+                        title: { display: true, text: 'จำนวนเคส' },
+                        ticks: { precision: 0 }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        title: { display: true, text: 'นาที' },
+                        grid: { drawOnChartArea: false }
+                    }
+                },
+                interaction: { mode: 'index', intersect: false }
+            }
+        });
+    }
+
+    function renderPerformanceGraph(compData, refLabel) {
+        const container = document.getElementById('comparisonContainer');
+        const mode = document.getElementById('viewMode').value;
+        const value = (mode === 'month') ? document.getElementById('filterMonth').value : document.getElementById('filterDate').value;
+        
+        if (!compData || value === 'all' || !value) { 
+            container.classList.add('d-none'); 
+            return; 
+        }
+        
+        container.classList.remove('d-none');
+        document.getElementById('compLabelSelected').textContent = value;
+        document.getElementById('compLabelRef').textContent = refLabel;
+
+        const ctx = document.getElementById('compChart').getContext('2d');
+        if (comparisonChart) comparisonChart.destroy();
+
+        comparisonChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [refLabel, value],
+                datasets: [
+                    { 
+                        label: 'งานทั้งหมด', 
+                        data: [compData.reference.total, compData.selected.total], 
+                        borderColor: '#31C1D7', 
+                        backgroundColor: 'rgba(49, 193, 215, 0.1)', 
+                        fill: true, 
+                        tension: 0.4, 
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    },
+                    { 
+                        label: 'ปิดงานสำเร็จ', 
+                        data: [compData.reference.closed, compData.selected.closed], 
+                        borderColor: '#10B981', 
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)', 
+                        fill: true, 
+                        tension: 0.4,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }
+                ]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { precision: 0 } 
+                    } 
+                },
+                plugins: {
+                    legend: { position: 'top' }
+                }
+            }
+        });
+    }
+
+    function resetFilters() {
+        document.getElementById('viewMode').value = 'month';
+        document.getElementById('filterMonth').value = 'all';
+        document.getElementById('filterAssignee').value = 'all';
+        toggleViewMode();
+    }
+  </script>
+</body>
+</html>
