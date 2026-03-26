@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>Case Management Tracking</title>
+  
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- FontAwesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <style>
+    :root { 
+        --ci-primary: #31C1D7; 
+        --ci-bg: #F8F9FA; 
+        --ci-text: #2d3436; 
+    }
+    body { 
+        font-family: 'Sarabun', sans-serif; 
+        background-color: var(--ci-bg); 
+        color: var(--ci-text); 
+        font-size: 0.95rem;
+    }
+    
+    /* --- Dashboard Cards --- */
+    .dash-card { 
+        border-radius: 12px; 
+        padding: 15px 20px; 
+        color: white; 
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        transition: all 0.2s ease;
+        cursor: pointer; 
+        user-select: none;
+        border: 3px solid transparent;
+        min-height: 100px;
+    }
+    .dash-card:hover { 
+        transform: translateY(-3px); 
+        box-shadow: 0 6px 15px rgba(0,0,0,0.15); 
+    }
+    .dash-card:active { 
+        transform: scale(0.98); 
+    }
+    
+    .active-filter {
+        border-color: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        transform: translateY(-2px);
+    }
+
+    .dash-danger { background: linear-gradient(135deg, #f87171, #ef4444); } 
+    .dash-warning { background: linear-gradient(135deg, #fbbf24, #f59e0b); } 
+    .dash-success { background: linear-gradient(135deg, #34d399, #10b981); } 
+    
+    .dash-title { font-size: 1rem; font-weight: 700; margin: 0; text-transform: uppercase; }
+    .dash-pct { font-size: 1.8rem; font-weight: 800; }
+    .dash-count { font-size: 0.85rem; opacity: 0.9; }
+
+    /* --- Table Styles --- */
+    .table-container { 
+        background: #fff; 
+        border-radius: 16px; 
+        padding: 20px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
+        overflow-x: auto; 
+        border: 1px solid #eef2f5;
+        min-height: 400px;
+    }
+    .table th { 
+        background-color: #f8fafc; 
+        color: #64748b; 
+        font-weight: 700; 
+        white-space: nowrap; 
+        font-size: 0.85rem; 
+        padding: 15px; 
+        border-bottom: 2px solid #e2e8f0; 
+        text-transform: uppercase;
+    }
+    .table td { 
+        vertical-align: middle; 
+        padding: 12px 15px; 
+        border-bottom: 1px solid #f1f5f9;
+    }
+    
+    .badge-status { 
+        padding: 6px 12px; 
+        border-radius: 20px; 
+        font-weight: 700; 
+        font-size: 0.75rem; 
+        display: inline-block; 
+        text-align: center; 
+        min-width: 100px;
+    }
+    .bg-status-pending { background-color: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; }
+    .bg-status-progress { background-color: #fef3c7; color: #d97706; border: 1px solid #fcd34d; }
+    .bg-status-closed { background-color: #d1fae5; color: #059669; border: 1px solid #6ee7b7; }
+
+    /* --- Topic Tags Display --- */
+    .topic-main-badge { 
+        font-size: 0.85rem; 
+        font-weight: 600; 
+        background-color: #e0f2f1; 
+        color: #00695c; 
+        padding: 4px 8px; 
+        border-radius: 6px; 
+        display: inline-block; 
+        margin-bottom: 4px; 
+    }
+    .topic-sub-tag { 
+        font-size: 0.75rem; 
+        background-color: #f1f5f9; 
+        color: #475569; 
+        padding: 2px 8px; 
+        border-radius: 12px; 
+        border: 1px solid #cbd5e1; 
+        margin-right: 4px; 
+        display: inline-block; 
+    }
+
+    /* --- Tags Selection in Modal --- */
+    .tag-selectable { 
+        cursor: pointer; 
+        padding: 6px 12px; 
+        border-radius: 20px; 
+        border: 1px solid #cbd5e1; 
+        background: white; 
+        color: #64748b; 
+        font-size: 0.85rem; 
+        transition: all 0.2s; 
+        user-select: none; 
+        margin-bottom: 4px;
+    }
+    .tag-selectable:hover { 
+        background: #f8fafc; 
+        border-color: #94a3b8; 
+    }
+    .tag-selectable.active { 
+        background-color: var(--ci-primary); 
+        color: white; 
+        border-color: var(--ci-primary); 
+        box-shadow: 0 2px 5px rgba(49, 193, 215, 0.3); 
+    }
+
+    /* --- Notification --- */
+    .noti-btn {
+        position: relative;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: #64748b;
+    }
+    .noti-badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 800;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #fff;
+    }
+    .noti-item { 
+        padding: 12px 15px; 
+        border-bottom: 1px solid #f1f5f9; 
+        cursor: pointer; 
+        transition: background-color 0.2s;
+    }
+    .noti-item:hover { background: #f0f9fb; }
+
+    /* --- History Card Style --- */
+    .history-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 15px;
+        position: relative;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border-left: 5px solid #ccc; /* Default color */
+    }
+    .history-card.Create { border-left-color: #31C1D7; }
+    .history-card.Accept { border-left-color: #f59e0b; }
+    .history-card.Close { border-left-color: #10B981; }
+    .history-card.Reassign { border-left-color: #6366f1; }
+    .history-card.Edit { border-left-color: #64748b; }
+
+    .history-icon {
+        width: 35px; height: 35px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        background: #f1f5f9;
+        margin-right: 15px;
+        color: #64748b;
+    }
+
+    /* --- Utility --- */
+    .btn-action { font-weight: 700; font-size: 0.8rem; border-radius: 8px; padding: 6px 12px; }
+    
+    /* Table Timeline (4 Points) */
+    .timeline-item { 
+        font-size: 0.75rem; 
+        display: flex; 
+        align-items: center; 
+        gap: 6px; 
+        margin-bottom: 4px; 
+    }
+    .timeline-dot { 
+        width: 6px; 
+        height: 6px; 
+        border-radius: 50%; 
+        display: inline-block; 
+    }
+    
+    /* Timeline 4 Points Colors */
+    .dot-purple { background-color: #a855f7; } /* User Notify (Effective) */
+    .dot-blue { background-color: #3b82f6; }   /* System Open (Created) */
+    .dot-yellow { background-color: #f59e0b; } /* Accepted */
+    .dot-green { background-color: #22c55e; }  /* Closed */
+  </style>
+</head>
+<body class="p-4">
+
+  <div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-secondary mb-1">
+                <i class="fas fa-headset me-2" style="color: var(--ci-primary);"></i>ระบบส่งเคส & ติดตามผล (SLA)
+            </h3>
+            <p class="text-muted small mb-0">บันทึกรายละเอียดการประสานงานและวัดประสิทธิภาพการทำงาน</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            
+            <!-- User Email Display -->
+            <div class="text-end me-2 d-none d-md-block">
+                <div class="text-muted" style="font-size: 0.75rem;">Login as</div>
+                <div class="fw-bold text-primary" style="font-size: 0.85rem;" id="currentUserDisplay">Loading...</div>
+            </div>
+
+            <!-- Notification Bell -->
+            <div class="dropdown me-2">
+                <div class="noti-btn shadow-sm" data-bs-toggle="dropdown">
+                    <i class="fas fa-bell"></i>
+                    <span class="noti-badge d-none" id="notiBadge">0</span>
+                </div>
+                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" style="width: 320px; border-radius: 12px; max-height: 400px; overflow-y: auto;">
+                    <li class="px-3 py-2 fw-bold border-bottom bg-light">งานที่ต้องดำเนินการ</li>
+                    <div id="notiContainer">
+                        <li class="noti-item text-center py-4 text-muted small">ไม่มีเคสใหม่ในขณะนี้</li>
+                    </div>
+                </ul>
+            </div>
+
+            <button class="btn btn-primary fw-bold rounded-pill shadow-sm px-4" style="background-color: var(--ci-primary); border:none;" onclick="openNewCaseModal()">
+                <i class="fas fa-plus-circle me-2"></i>เปิดเคสใหม่
+            </button>
+            
+            <button class="btn btn-info text-white fw-bold rounded-pill shadow-sm px-3" onclick="window.top.location.href = '<?= url ?>?page=dashboard'">
+                <i class="fas fa-chart-pie me-1"></i> Dashboard
+            </button>
+
+            <!-- Config Button (Hidden by default, shown if permission granted) -->
+            <button class="btn btn-outline-secondary fw-bold rounded-pill shadow-sm px-3 d-none" id="btnConfig" onclick="window.top.location.href = '<?= url ?>?page=config_case'">
+                <i class="fas fa-cog me-1"></i>ตั้งค่า
+            </button>
+        </div>
+    </div>
+
+    <!-- Dashboard Cards (Click to Filter) -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="dash-card dash-danger" id="card-pending" onclick="toggleStatusFilter('รอการประสานงาน')">
+                <div>
+                    <h5 class="dash-title">รอการประสานงาน</h5>
+                    <div class="dash-count" id="dashCountPending">0 เคส</div>
+                </div>
+                <div class="dash-pct" id="dashPctPending">0.0%</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dash-card dash-warning" id="card-progress" onclick="toggleStatusFilter('กำลังประสานงาน')">
+                <div>
+                    <h5 class="dash-title">กำลังประสานงาน</h5>
+                    <div class="dash-count" id="dashCountProgress">0 เคส</div>
+                </div>
+                <div class="dash-pct" id="dashPctProgress">0.0%</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dash-card dash-success" id="card-closed" onclick="toggleStatusFilter('ปิดเคส')">
+                <div>
+                    <h5 class="dash-title">ปิดเคสสมบูรณ์</h5>
+                    <div class="dash-count" id="dashCountClosed">0 เคส</div>
+                </div>
+                <div class="dash-pct" id="dashPctClosed">0.0%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="d-flex justify-content-between mb-3 align-items-center">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Search Box with Clear Button -->
+            <div class="input-group shadow-sm" style="max-width: 250px;">
+                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 border-end-0 ps-0" id="searchInput" placeholder="ค้นหาข้อมูล..." onkeyup="renderTable()">
+                <button class="btn btn-white bg-white border-start-0 border text-muted" type="button" onclick="clearSearch()" title="ล้างคำค้นหา">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- New: Assignee Filter -->
+            <select class="form-select shadow-sm fw-bold text-secondary" id="filterAssignee" onchange="renderTable()" style="max-width: 180px;">
+                <option value="all">👤 เจ้าหน้าที่ทุกคน</option>
+            </select>
+
+            <!-- New: Date Filter -->
+            <input type="date" class="form-control shadow-sm fw-bold text-secondary" id="filterDate" onchange="renderTable()" style="max-width: 150px;">
+            
+            <!-- New: My Cases Button -->
+            <button class="btn btn-outline-primary fw-bold rounded-pill px-3 shadow-sm" onclick="filterMyCases()">
+                <i class="fas fa-user-check me-1"></i> งานของฉัน
+            </button>
+
+            <!-- Status Indicator -->
+            <div id="filterIndicator" class="badge bg-secondary rounded-pill px-3 d-none" style="cursor:pointer;" onclick="toggleStatusFilter('all')">
+                สถานะ: <span id="activeStatusLabel"></span> <i class="fas fa-times ms-1"></i>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-sm btn-light border rounded-pill px-3 fw-bold text-secondary" onclick="loadData(true)">
+                <i class="fas fa-sync-alt me-1"></i>รีเฟรช
+            </button>
+            <div class="fw-bold text-muted small">รวม: <span id="totalCases" class="text-primary fs-6">0</span></div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th class="text-center">สถานะ / ID</th>
+                    <th>SLA Timeline (4 Points) <i class="fas fa-info-circle text-muted small ms-1" data-bs-toggle="tooltip" title="ม่วง:  เวลาที่Assign (User) | ฟ้า: เวลาที่เปิดเคส (System) | เหลือง: รับเคส | เขียว: ปิดงาน"></i></th>
+                    <th>ระยะเวลา</th>
+                    <th>ผู้รับผิดชอบ</th>
+                    <th>ข้อมูลแม่บ้าน</th>
+                    <th>หัวข้อ</th>
+                    <th class="text-center">Chat</th>
+                    <th style="width: 200px;">การดำเนินการล่าสุด</th>
+                    <th class="text-center" style="width: 140px;">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                 <tr><td colspan="9" class="text-center py-5 text-muted">กำลังโหลดข้อมูล...</td></tr>
+            </tbody>
+        </table>
+        <div id="noData" class="text-center py-5 text-muted d-none">
+            <i class="fas fa-inbox fa-3x mb-3 opacity-25"></i><br>ไม่พบข้อมูลเคสที่ตรงตามเงื่อนไข
+        </div>
+    </div>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- 1. Modal: เปิดเคสใหม่ -->
+  <div class="modal fade" id="newCaseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header text-white border-0" style="background-color: var(--ci-primary);">
+          <h5 class="modal-title fw-bold"><i class="fas fa-paper-plane me-2"></i>เปิดเคสงานใหม่</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">วันที่แจ้งเรื่อง (Effective Date)</label>
+                    <input type="date" class="form-control shadow-sm" id="nc_caseDate">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">เวลา</label>
+                    <input type="time" class="form-control shadow-sm" id="nc_caseTime">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">รหัสคุณแม่บ้าน <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <!-- Autocomplete Datalist -->
+                        <input type="text" class="form-control shadow-sm" id="nc_maidId" placeholder="พิมพ์รหัส/ชื่อ..." list="maidOptions" autocomplete="off" oninput="handleMaidIdInput()">
+                        <datalist id="maidOptions"></datalist>
+                        <span class="input-group-text bg-white" id="maidLoadingIcon" style="display:none;"><i class="fas fa-spinner fa-spin text-primary"></i></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+                    <!-- Input Group สำหรับพิมพ์ชื่อและปุ่มบันทึก -->
+                    <div class="input-group">
+                        <input type="text" class="form-control shadow-sm" id="nc_maidName" placeholder="ระบุชื่อแม่บ้าน...">
+                        <button class="btn btn-outline-success" type="button" id="btnAddMaid" onclick="submitAddNewMaid()" title="บันทึกแม่บ้านใหม่ลงฐานข้อมูล">
+                            <i class="fas fa-user-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">ผู้รับผิดชอบเคส <span class="text-danger">*</span></label>
+                    <select class="form-select shadow-sm" id="nc_assignee">
+                        <option value="" selected disabled>กำลังโหลดรายชื่อ...</option>
+                    </select>
+                </div>
+                
+                <!-- Topic Selection: Main & Sub -->
+                <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">หัวข้อหลัก <span class="text-danger">*</span></label>
+                    <select class="form-select shadow-sm mb-2" id="nc_mainTopic" onchange="renderSubTopics('nc')">
+                        <option value="" selected disabled>-- เลือกหัวข้อหลัก --</option>
+                    </select>
+                    
+                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อย่อย (เลือกได้หลายข้อ)</label>
+                    <div id="nc_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light" style="min-height: 50px;">
+                        <span class="text-muted small align-self-center ps-2">กรุณาเลือกหัวข้อหลักก่อน</span>
+                    </div>
+                    
+                    <!-- Others Input (Hidden by default) -->
+                    <div id="nc_otherInputDiv" class="mt-2 d-none">
+                        <input type="text" id="nc_otherDetail" class="form-control shadow-sm" placeholder="โปรดระบุรายละเอียดเพิ่มเติม...">
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">Link Chat (beneat-chat)</label>
+                    <input type="url" class="form-control shadow-sm" id="nc_chatLink" placeholder="วางลิงก์ห้องแชท...">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer border-0 bg-light">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" style="background-color: var(--ci-primary); border:none;" onclick="submitNewCase()" id="btnSubmitNewCase">ยืนยันเปิดเคส</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Modal: แก้ไขข้อมูลเคส (Edit Case) -->
+  <div class="modal fade" id="editCaseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-primary text-white border-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>แก้ไขข้อมูลเคส</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+            <input type="hidden" id="ec_id">
+            <div class="row g-3">
+                <div class="col-12 text-center mb-2">
+                    <span class="badge bg-light text-primary border fs-6" id="ec_displayId">CASE-XX-XXXX</span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">รหัสคุณแม่บ้าน</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control shadow-sm" id="ec_maidId" list="maidOptions" oninput="handleEditMaidIdInput()">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">ชื่อ-นามสกุล</label>
+                    <input type="text" class="form-control shadow-sm" id="ec_maidName">
+                </div>
+                
+                <!-- Topic Selection Edit -->
+                <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">หัวข้อหลัก</label>
+                    <select class="form-select shadow-sm mb-2" id="ec_mainTopic" onchange="renderSubTopics('ec')"></select>
+                    
+                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อย่อย</label>
+                    <div id="ec_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light" style="min-height: 50px;"></div>
+                    
+                    <!-- Others Input Edit -->
+                    <div id="ec_otherInputDiv" class="mt-2 d-none">
+                        <input type="text" id="ec_otherDetail" class="form-control shadow-sm" placeholder="โปรดระบุรายละเอียดเพิ่มเติม...">
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">Link Chat</label>
+                    <input type="url" class="form-control shadow-sm" id="ec_chatLink">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer border-0 bg-light">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="submitEditCase()" id="btnSubmitEditCase">บันทึกการแก้ไข</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Modal: จัดการความคืบหน้า (Manage Case) -->
+  <div class="modal fade" id="manageCaseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-dark text-white border-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>จัดการความคืบหน้าเคส</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+            <input type="hidden" id="mc_id">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">บันทึกรายละเอียดการดำเนินการ <span class="text-danger">*</span></label>
+                <textarea class="form-control shadow-sm" id="mc_details" rows="5" placeholder="ระบุความคืบหน้า..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer border-0 bg-light d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">ยกเลิก</button>
+          <div class="d-flex gap-2">
+              <button type="button" class="btn btn-warning fw-bold rounded-pill px-3 shadow-sm" id="btnUpdateDetails" onclick="submitUpdateDetails()">บันทึก</button>
+              <button type="button" class="btn btn-success fw-bold rounded-pill px-4 shadow-sm" id="btnCloseCase" onclick="submitCloseCase()">ปิดเคส</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Modal: ประวัติการดำเนินการ (History Log) -->
+  <div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-secondary text-white border-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-history me-2"></i>ประวัติการดำเนินการ</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 bg-light">
+            <div id="historyTimeline" style="max-height: 450px; overflow-y: auto;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Modal: ส่งต่อเคส (Reassign) -->
+  <div class="modal fade" id="reassignModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-warning text-dark border-0">
+          <h6 class="modal-title fw-bold">ส่งต่อผู้รับผิดชอบ</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+            <input type="hidden" id="ra_id">
+            <div class="mb-3">
+                <label class="form-label small fw-bold">มอบหมายงานให้กับ:</label>
+                <select class="form-select shadow-sm" id="ra_newAssignee"></select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">หมายเหตุ / ฝากข้อความ (Note):</label>
+                <textarea class="form-control shadow-sm" id="ra_note" rows="3" placeholder="ระบุเหตุผล หรือสิ่งที่ต้องทำต่อ..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-warning w-100 fw-bold shadow-sm" onclick="submitReassign()" id="btnSubmitReassign">ยืนยันการส่งต่อ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // --- Global Variables ---
+    let rawData = [];
+    let configData = { admins: [], topicData: [], adminDetails: [] }; 
+    let currentStatusFilter = 'all'; 
+    let newCaseModal, manageCaseModal, reassignModal, historyModal, editCaseModal;
+    let currentUserEmail = "";
+    let maidDatabase = []; 
+    let readCases = []; 
+    const OTHERS_LABEL = "อื่นๆ (โปรดระบุ)";
+
+    const Toast = Swal.mixin({
+      toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar: true
+    });
+
+    /**
+     * Helper: Sanitize HTML to prevent injection
+     */
+    function h(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+            .replace(/`/g, '&#96;')
+            .replace(/\$/g, '&#36;');
+    }
+    
+    /**
+     * Helper: Escape String for JS arguments in onclick
+     */
+    function escapeJs(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '');
+    }
+
+    /**
+     * Helper: Parse Date (dd/MM/yyyy HH:mm:ss) with BE 25xx support
+     */
+    function parseDateTime(s) {
+        if (!s || typeof s !== 'string') return 0;
+        try {
+            const parts = s.split(' ');
+            if (parts.length < 2) return 0;
+            const dateParts = parts[0].split('/');
+            const timeParts = parts[1].split(':');
+            if (dateParts.length !== 3) return 0;
+            
+            let d = parseInt(dateParts[0], 10);
+            let m = parseInt(dateParts[1], 10) - 1;
+            let y = parseInt(dateParts[2], 10);
+            
+            if (y > 2400) y -= 543; // Convert BE to AD
+
+            let h = parseInt(timeParts[0], 10) || 0;
+            let min = parseInt(timeParts[1], 10) || 0;
+            let sec = timeParts[2] ? parseInt(timeParts[2], 10) : 0;
+            
+            return new Date(y, m, d, h, min, sec).getTime();
+        } catch (e) { return 0; }
+    }
+    
+    // Check if date is Today (based on System Time)
+    function checkIsToday(sysTimeStr) {
+        const ts = parseDateTime(sysTimeStr);
+        if (ts === 0) return false;
+        const d = new Date(ts);
+        const now = new Date();
+        return d.getDate() === now.getDate() &&
+               d.getMonth() === now.getMonth() &&
+               d.getFullYear() === now.getFullYear();
+    }
+    
+    // Check if date is matches the filter date
+    function checkDateMatch(sysTimeStr, filterDateVal) {
+        if (!filterDateVal) return true; // No filter
+        const ts = parseDateTime(sysTimeStr);
+        if (ts === 0) return false;
+        
+        const d = new Date(ts);
+        const [fYear, fMonth, fDay] = filterDateVal.split('-');
+        
+        return d.getDate() === parseInt(fDay) &&
+               (d.getMonth() + 1) === parseInt(fMonth) &&
+               d.getFullYear() === parseInt(fYear);
+    }
+    
+    // Smart Time Display
+    function smartTime(dateTimeStr) {
+        if (!dateTimeStr) return '--:--';
+        const ts = parseDateTime(dateTimeStr);
+        if (ts === 0) return '--:--';
+        const d = new Date(ts);
+        const now = new Date();
+        
+        const isToday = d.getDate() === now.getDate() && 
+                        d.getMonth() === now.getMonth() && 
+                        d.getFullYear() === now.getFullYear();
+        
+        const yest = new Date(now);
+        yest.setDate(now.getDate() - 1);
+        const isYesterday = d.getDate() === yest.getDate() && 
+                            d.getMonth() === yest.getMonth() && 
+                            d.getFullYear() === yest.getFullYear();
+
+        const timePart = dateTimeStr.split(' ')[1] ? dateTimeStr.split(' ')[1].substring(0, 5) : '';
+
+        if (isToday) {
+            return timePart;
+        } else if (isYesterday) {
+            return `<span class="badge bg-light text-secondary border fw-normal" style="font-size:0.65em; padding: 2px 4px;">เมื่อวาน ${timePart}</span>`;
+        } else {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `<span class="badge bg-light text-secondary border fw-normal" style="font-size:0.65em; padding: 2px 4px;">${dd}/${mm} ${timePart}</span>`;
+        }
+    }
+
+    // Helper: Calculate Hour Difference
+    function getHoursDiff(dateTimeStr) {
+        if (!dateTimeStr) return 0;
+        const target = parseDateTime(dateTimeStr);
+        if (target === 0) return 0;
+        return (new Date().getTime() - target) / (1000 * 60 * 60);
+    }
+    
+    function isOver12Hours(dateTimeStr) {
+        return getHoursDiff(dateTimeStr) > 12;
+    }
+
+    // Calc Duration: System Start -> End
+    function calculateDuration(startStr, endStr) {
+        if (!startStr) return '-';
+        const start = parseDateTime(startStr);
+        const end = (endStr && endStr !== "") ? parseDateTime(endStr) : new Date().getTime();
+        
+        if (start === 0) return '-';
+
+        let diff = end - start;
+        if (isNaN(diff)) return '-';
+        if (diff < 0) diff = 0;
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        let res = [];
+        if (days > 0) res.push(`${days} วัน`);
+        if (hours > 0) res.push(`${hours} ชม.`);
+        res.push(`${minutes} น.`);
+        
+        return res.length > 0 ? res.join(' ') : '0 น.';
+    }
+
+    function getDisplayName(email) {
+        if (!email) return '-';
+        const clean = email.trim();
+        if (configData.adminDetails) {
+            const found = configData.adminDetails.find(a => a.email === clean);
+            if (found && found.name) return found.name;
+        }
+        return clean.split('@')[0];
+    }
+
+    function setLoading(btnId, isLoading, text = '') {
+        const btn = document.getElementById(btnId);
+        if(!btn) return;
+        if (isLoading) {
+            btn.disabled = true;
+            btn.dataset.original = btn.innerHTML;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${text || 'กำลังบันทึก...'}`;
+        } else {
+            btn.disabled = false;
+            if (btn.dataset.original) btn.innerHTML = btn.dataset.original;
+        }
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        renderTable();
+    }
+
+    function toggleStatusFilter(status) {
+        currentStatusFilter = (currentStatusFilter === status) ? 'all' : status;
+        document.querySelectorAll('.dash-card').forEach(c => c.classList.remove('active-filter'));
+        const indicator = document.getElementById('filterIndicator');
+        const label = document.getElementById('activeStatusLabel');
+        if (currentStatusFilter !== 'all') {
+            const id = status === 'รอการประสานงาน' ? 'card-pending' : (status === 'กำลังประสานงาน' ? 'card-progress' : 'card-closed');
+            document.getElementById(id).classList.add('active-filter');
+            indicator.classList.remove('d-none');
+            label.textContent = status;
+        } else { indicator.classList.add('d-none'); }
+        renderTable();
+    }
+
+    function filterMyCases() {
+        if (currentUserEmail) {
+            document.getElementById('filterAssignee').value = currentUserEmail;
+            renderTable();
+            Toast.fire({ icon: 'success', title: 'แสดงงานของคุณแล้ว' });
+        }
+    }
+
+    // --- Main Logic ---
+
+    window.onload = function() {
+        newCaseModal = new bootstrap.Modal(document.getElementById('newCaseModal'));
+        manageCaseModal = new bootstrap.Modal(document.getElementById('manageCaseModal'));
+        reassignModal = new bootstrap.Modal(document.getElementById('reassignModal'));
+        historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+        editCaseModal = new bootstrap.Modal(document.getElementById('editCaseModal'));
+        
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(t => new bootstrap.Tooltip(t));
+
+        loadData(true);
+        loadMaidData();
+    };
+
+    function loadData(full) {
+        if(full) Swal.fire({ title: 'กำลังโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        google.script.run.withSuccessHandler(res => {
+            if(full) Swal.close();
+            
+            // Updated: Parse System Time from Logs for Filtering
+            rawData = (res.data || []).map(item => {
+                let sysTime = item.timeCreated; 
+                try {
+                    const logs = JSON.parse(item.historyLogs || "[]");
+                    const c = logs.find(l => l.action === 'Create');
+                    if(c && c.timestamp) sysTime = c.timestamp;
+                } catch(e){}
+                item.systemCreatedTime = sysTime; 
+                return item;
+            }).sort((a, b) => b.id.localeCompare(a.id));
+            
+            currentUserEmail = res.currentUser;
+            document.getElementById('currentUserDisplay').textContent = currentUserEmail;
+            
+            // Show Config Button if permitted
+            if (res.canConfig) {
+                document.getElementById('btnConfig').classList.remove('d-none');
+            }
+
+            configData = res.configs || { admins: [], topicData: [], adminDetails: [] };
+            populateConfigDropdowns(configData);
+            
+            updateNotifications();
+            renderTable();
+        }).getCasesData();
+    }
+
+    // Helper to render topic nicely
+    function getTopicHtml(topicRaw) {
+        try {
+            // Try parsing JSON
+            const tObj = JSON.parse(topicRaw);
+            if (tObj && tObj.main) {
+                let html = `<div class="topic-main-badge">${h(tObj.main)}</div>`;
+                if (tObj.sub && Array.isArray(tObj.sub) && tObj.sub.length > 0) {
+                    html += `<div>`;
+                    tObj.sub.forEach(s => {
+                        html += `<span class="topic-sub-tag">${h(s)}</span>`;
+                    });
+                    html += `</div>`;
+                }
+                return html;
+            }
+        } catch (e) {
+            // Legacy string
+            return `<span class="badge bg-light text-dark border-0 shadow-sm">${h(topicRaw)}</span>`;
+        }
+        return '-';
+    }
+
+    // Also need to get plain text for search
+    function getTopicText(topicRaw) {
+        try {
+            const tObj = JSON.parse(topicRaw);
+            if (tObj && tObj.main) return tObj.main + " " + (tObj.sub ? tObj.sub.join(" ") : "");
+        } catch(e) { return topicRaw; }
+        return "";
+    }
+
+    function renderTable() {
+        const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+        // New Filters
+        const fAssignee = document.getElementById('filterAssignee').value;
+        const fDate = document.getElementById('filterDate').value;
+
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        
+        // Smart Search: If searching for Case ID, ignore other filters
+        const isIdSearch = searchText.startsWith('case-');
+
+        const filtered = rawData.filter(item => {
+            const searchPool = `${item.id} ${item.maidName} ${item.maidId} ${getDisplayName(item.assignee)} ${getTopicText(item.topic)}`.toLowerCase();
+            const matchesSearch = searchPool.includes(searchText);
+            
+            if (isIdSearch) {
+                // If searching by ID, only check search match
+                return matchesSearch;
+            }
+            
+            // Standard Filters
+            const matchesStatus = (currentStatusFilter === 'all' || item.status === currentStatusFilter);
+            const matchesAssignee = (fAssignee === 'all' || item.assignee.trim() === fAssignee.trim());
+            const matchesDate = checkDateMatch(item.systemCreatedTime, fDate);
+            
+            return matchesSearch && matchesStatus && matchesAssignee && matchesDate;
+        });
+        
+        recalculateStats(filtered);
+
+        if (filtered.length === 0) { document.getElementById('noData').classList.remove('d-none'); return; }
+        document.getElementById('noData').classList.add('d-none');
+        
+        filtered.forEach(item => {
+            let badge = item.status === 'รอการประสานงาน' ? 'bg-status-pending' : (item.status === 'กำลังประสานงาน' ? 'bg-status-progress' : 'bg-status-closed');
+            
+            // Use ID for function calls to prevent syntax errors from special chars in other fields
+            const clickId = escapeJs(item.id);
+            const safeAssignee = escapeJs(item.assignee);
+            
+            let actions = '';
+            if (item.status === 'รอการประสานงาน') {
+                actions = `<button class="btn btn-sm btn-action btn-outline-warning w-100 mb-1" onclick="acceptCase('${clickId}', this)">รับเคส</button>`;
+            } else if (item.status === 'กำลังประสานงาน') {
+                actions = `<button class="btn btn-sm btn-action btn-primary w-100 mb-1" onclick="openManageModal('${clickId}')">จัดการ</button>`;
+            } else {
+                actions = `<div class="text-success fw-bold small text-center"><i class="fas fa-check-circle"></i> DONE</div>`;
+            }
+            if (item.status !== 'ปิดเคส') {
+                actions += `<button class="btn btn-sm btn-link text-muted p-0 w-100 text-decoration-none" style="font-size:0.7rem;" onclick="openReassign('${clickId}', '${safeAssignee}')">ส่งต่อ</button>`;
+            }
+            // ปุ่มประวัติ และ ปุ่มแก้ไข
+            actions += `<div class="d-flex justify-content-center gap-2 mt-1">
+                          <button class="btn btn-sm btn-link text-secondary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openHistoryModal('${clickId}')"><i class="fas fa-history me-1"></i>ประวัติ</button>
+                          ${item.status !== 'ปิดเคส' ? `<button class="btn btn-sm btn-link text-primary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openEditModal('${clickId}')"><i class="fas fa-pen"></i></button>` : ''}
+                        </div>`;
+            
+            const t1 = smartTime(item.timeCreated); 
+            const t2 = smartTime(item.systemCreatedTime); 
+            const t3 = smartTime(item.timeAccepted); 
+            const t4 = smartTime(item.timeClosed); 
+            
+            const profileUrl = item.maidId ? `https://admin-test.beneat.co/professional/${item.maidId.trim()}/profile` : '#';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-center"><span class="badge-status ${badge} mb-1">${h(item.status)}</span><div class="text-muted fw-bold" style="font-size:0.7rem;">${h(item.id)}</div></td>
+                <td>
+                    <div class="timeline-item"><span class="timeline-dot dot-purple"></span> ${smartTime(item.timeCreated)} <small class="text-muted ms-1">(Assign เวลา)</small></div>
+                    <div class="timeline-item"><span class="timeline-dot dot-blue"></span> ${smartTime(item.systemCreatedTime)} <small class="text-muted ms-1">(เปิดเคส)</small></div>
+                    ${item.timeAccepted ? `<div class="timeline-item"><span class="timeline-dot dot-yellow"></span> ${smartTime(item.timeAccepted)} <small class="text-muted ms-1">(รับ)</small></div>` : ''}
+                    ${item.timeClosed ? `<div class="timeline-item"><span class="timeline-dot dot-green"></span> ${smartTime(item.timeClosed)}<small class="text-muted ms-1">(ปิด)</small></div>` : ''}
+                </td>
+                <td><span class="badge bg-light text-dark border fw-normal shadow-sm">${h(calculateDuration(item.systemCreatedTime, item.timeClosed))}</span></td>
+                <td>
+                    <div class="fw-bold text-dark small">${h(getDisplayName(item.creator))}</div>
+                    <div class="text-primary small mt-1"><i class="fas fa-arrow-right me-1 text-muted opacity-50"></i>${h(getDisplayName(item.assignee))}</div>
+                </td>
+                <td>
+                    <a href='${profileUrl}' target="_blank" class="text-decoration-none">
+                        <div class="fw-bold text-primary">${h(item.maidId)}</div>
+                        <div class="small text-muted text-truncate" style="max-width: 110px;">${h(item.maidName)}</div>
+                    </a>
+                </td>
+                <td>${getTopicHtml(item.topic)}</td>
+                <td class="text-center">${item.chatLink ? `<a href="${h(item.chatLink)}" target="_blank" class="text-info"><i class="fas fa-comment-dots fs-5"></i></a>` : '-'}</td>
+                <td><div class="small text-muted text-wrap" style="max-width: 250px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">${h(item.actionDetails) || '<i class="opacity-25">ไม่มีข้อมูล</i>'}</div></td>
+                <td class="text-center">${actions}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function recalculateStats(dataSet) {
+        const stats = { total: dataSet.length, pending: 0, progress: 0, closed: 0 };
+        dataSet.forEach(item => {
+            if (item.status === 'รอการประสานงาน') stats.pending++;
+            else if (item.status === 'กำลังประสานงาน') stats.progress++;
+            else if (item.status === 'ปิดเคส') stats.closed++;
+        });
+        stats.pendingPct = stats.total > 0 ? ((stats.pending / stats.total) * 100).toFixed(1) : 0;
+        stats.progressPct = stats.total > 0 ? ((stats.progress / stats.total) * 100).toFixed(1) : 0;
+        stats.closedPct = stats.total > 0 ? ((stats.closed / stats.total) * 100).toFixed(1) : 0;
+        updateDashboard(stats);
+    }
+
+    function updateNotifications() {
+        const notiContainer = document.getElementById('notiContainer');
+        const notiBadge = document.getElementById('notiBadge');
+        
+        const myCases = rawData.filter(item => item.assignee === currentUserEmail && item.status !== 'ปิดเคส');
+        
+        let displayNotis = [];
+
+        myCases.forEach(item => {
+            let isChatWaitLong = false;
+            const tNotify = parseDateTime(item.timeCreated);
+            const tSystem = parseDateTime(item.systemCreatedTime);
+            
+            // 1. Logic แชทรอนาน
+            if (tNotify > 0 && tSystem > 0) {
+                const diffHours = (tSystem - tNotify) / (1000 * 60 * 60);
+                if (diffHours > 3) isChatWaitLong = true;
+            }
+
+            // 2. Logic LATE
+            let isLate = false;
+            if (item.status === 'กำลังประสานงาน') {
+                const hoursWorking = getHoursDiff(item.timeAccepted);
+                if (hoursWorking > 6) isLate = true;
+            }
+            else if (item.status === 'รอการประสานงาน') {
+                const hoursPending = getHoursDiff(item.systemCreatedTime);
+                if (hoursPending > 2) isLate = true;
+            }
+
+            // 3. Find Reassign Note (NEW)
+            let reassignNote = "";
+            try {
+                const logs = JSON.parse(item.historyLogs || "[]");
+                // Find last Reassign log
+                const lastReassign = [...logs].reverse().find(l => l.action === 'Reassign');
+                if (lastReassign && lastReassign.details) {
+                    const detailStr = lastReassign.details;
+                    // Check if current user is the target of reassign
+                    if (detailStr.includes(currentUserEmail) || detailStr.includes(getDisplayName(currentUserEmail))) {
+                         // Extract text inside (Note: ...) if present
+                         const match = detailStr.match(/\(Note: (.*)\)/);
+                         if (match) {
+                             reassignNote = match[1];
+                         }
+                    }
+                }
+            } catch(e){}
+
+            const shouldShow = (item.status === 'รอการประสานงาน') || 
+                               (item.status === 'กำลังประสานงาน' && (isLate || !readCases.includes(item.id))) ||
+                               isChatWaitLong;
+
+            if (shouldShow) {
+                displayNotis.push({ ...item, isChatWaitLong, isLate, reassignNote });
+            }
+        });
+
+        notiContainer.innerHTML = '';
+        if (displayNotis.length > 0) {
+            notiBadge.classList.remove('d-none');
+            notiBadge.textContent = displayNotis.length;
+            
+            displayNotis.forEach(item => {
+                let badgeHtml = '';
+                if (item.isChatWaitLong) {
+                     badgeHtml += '<span class="badge bg-dark border border-warning text-white p-1 ms-1" style="font-size:9px;"><i class="fas fa-fire text-warning me-1"></i>แชทรอนาน</span>';
+                }
+                if (item.isLate) {
+                     badgeHtml += '<span class="badge bg-danger p-1 ms-1" style="font-size:8px;">LATE</span>';
+                }
+
+                // Show Note if available
+                let noteHtml = '';
+                if (item.reassignNote) {
+                    noteHtml = `<div class="mt-1 small text-info"><i class="fas fa-sticky-note me-1"></i>"${h(item.reassignNote)}"</div>`;
+                }
+
+                const li = document.createElement('li');
+                li.className = 'noti-item';
+                li.onclick = () => handleNotiClick(item.id);
+                li.innerHTML = `
+                    <div class="d-flex align-items-start">
+                        <i class="fas ${item.status === 'รอการประสานงาน' ? 'fa-clock text-danger' : 'fa-hourglass-half text-warning'} me-2 fs-6 mt-1"></i>
+                        <div class="flex-grow-1 overflow-hidden">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="fw-bold text-truncate small me-1">${h(getTopicText(item.topic))}</div>
+                                <div class="flex-shrink-0">${badgeHtml}</div>
+                            </div>
+                            <div class="text-muted text-truncate" style="font-size:0.75rem;">แม่บ้าน: ${h(item.maidName)} (${h(item.maidId)})</div>
+                            ${noteHtml}
+                        </div>
+                    </div>`;
+                notiContainer.appendChild(li);
+            });
+        } else {
+            notiBadge.classList.add('d-none');
+            notiContainer.innerHTML = '<li class="noti-item text-center py-4 text-muted small">ไม่มีเคสใหม่ในขณะนี้</li>';
+        }
+    }
+
+    function handleNotiClick(caseId) {
+        document.getElementById('searchInput').value = caseId;
+        // Reset filters to ensure case is found
+        document.getElementById('filterAssignee').value = 'all';
+        document.getElementById('filterDate').value = '';
+        currentStatusFilter = 'all';
+        if (!readCases.includes(caseId)) readCases.push(caseId);
+        renderTable();
+        updateNotifications();
+        Toast.fire({ icon: 'info', title: 'แสดงเคส ' + caseId });
+    }
+
+    function openHistoryModal(caseId) {
+        const item = rawData.find(x => x.id === caseId);
+        if(!item) return;
+        const container = document.getElementById('historyTimeline');
+        container.innerHTML = '';
+        let logs = [];
+        try { logs = JSON.parse(item.historyLogs || "[]"); } catch(e) { logs = []; }
+        if(logs.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-3">ไม่มีประวัติการดำเนินการ</div>';
+        } else {
+            [...logs].reverse().forEach(log => {
+                const iconMap = { Create: 'fa-plus-circle text-primary', Accept: 'fa-hand-paper text-warning', Close: 'fa-check-circle text-success', Reassign: 'fa-exchange-alt text-info', Edit: 'fa-pen text-secondary' };
+                const actionMap = { Create: 'เปิดเคส', Accept: 'รับเคส', Close: 'ปิดเคส', Reassign: 'ส่งต่องาน', Edit: 'แก้ไขข้อมูล' };
+                
+                // Card UI
+                container.innerHTML += `
+                    <div class="history-card ${log.action}">
+                        <div class="d-flex align-items-start">
+                            <div class="history-icon shadow-sm">
+                                <i class="fas ${iconMap[log.action] || 'fa-circle'} fs-5"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="fw-bold text-dark">${actionMap[log.action] || log.action}</span>
+                                    <small class="text-muted">${h(log.timestamp)}</small>
+                                </div>
+                                <div class="small text-muted mb-2">โดย: ${h(getDisplayName(log.user))}</div>
+                                <div class="p-2 bg-light rounded text-secondary small border">${h(log.details) || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        historyModal.show();
+    }
+
+    function populateConfigDropdowns(configs) {
+        // Populate New Case Assignee
+        let opts = `<option value="" selected disabled>-- เลือกผู้รับผิดชอบ --</option>`;
+        let optsFilter = `<option value="all">👤 เจ้าหน้าที่ทุกคน</option>`; // Filter Options
+        
+        if (configs.adminDetails && configs.adminDetails.length > 0) {
+            configs.adminDetails.forEach(a => {
+                const label = `${h(a.name)} (${h(a.email)})`;
+                opts += `<option value="${h(a.email)}">${label}</option>`;
+                optsFilter += `<option value="${h(a.email)}">${label}</option>`;
+            });
+        } else { 
+            configs.admins.forEach(e => {
+                opts += `<option value="${h(e)}">${h(e)}</option>`;
+                optsFilter += `<option value="${h(e)}">${h(e)}</option>`;
+            });
+        }
+        
+        document.getElementById('nc_assignee').innerHTML = opts;
+        document.getElementById('ra_newAssignee').innerHTML = opts;
+        document.getElementById('filterAssignee').innerHTML = optsFilter; // Update Filter Dropdown
+
+        // Populate Topic Main
+        let opT = `<option value="" selected disabled>-- เลือกหัวข้อหลัก --</option>`;
+        configs.topicData.forEach((t, idx) => { opT += `<option value="${idx}">${h(t.main)}</option>`; });
+        document.getElementById('nc_mainTopic').innerHTML = opT;
+        document.getElementById('ec_mainTopic').innerHTML = opT;
+    }
+
+    // --- Topic Logic (Main + Sub) ---
+    function renderSubTopics(prefix) {
+        const mainIdx = document.getElementById(`${prefix}_mainTopic`).value;
+        const container = document.getElementById(`${prefix}_subTopicContainer`);
+        container.innerHTML = '';
+        
+        // Hide Others Input if changing main topic
+        const otherDiv = document.getElementById(`${prefix}_otherInputDiv`);
+        otherDiv.classList.add('d-none');
+        document.getElementById(`${prefix}_otherDetail`).value = '';
+
+        if (mainIdx === "" || mainIdx === null) return;
+        
+        const subs = [...(configData.topicData[parseInt(mainIdx)].subs || [])];
+        
+        // 1. Auto add "Others" option
+        subs.push(OTHERS_LABEL);
+
+        if (!subs || subs.length === 0) { container.innerHTML = '<span class="text-muted small ps-2">ไม่มีหัวข้อย่อย</span>'; return; }
+
+        subs.forEach(sub => {
+            const el = document.createElement('span');
+            el.className = 'tag-selectable';
+            el.textContent = sub;
+            el.onclick = function() { 
+                this.classList.toggle('active'); 
+                // Toggle "Others" input
+                if (sub === OTHERS_LABEL) {
+                    if (this.classList.contains('active')) otherDiv.classList.remove('d-none');
+                    else otherDiv.classList.add('d-none');
+                }
+            };
+            container.appendChild(el);
+        });
+    }
+
+    function openNewCaseModal() {
+        const now = new Date();
+        document.getElementById('nc_caseDate').value = now.toISOString().split('T')[0];
+        document.getElementById('nc_caseTime').value = now.toTimeString().slice(0,5);
+        document.getElementById('nc_maidId').value = '';
+        document.getElementById('nc_maidName').value = '';
+        document.getElementById('nc_mainTopic').value = ""; 
+        document.getElementById('nc_subTopicContainer').innerHTML = '<span class="text-muted small align-self-center ps-2">กรุณาเลือกหัวข้อหลักก่อน</span>';
+        document.getElementById('nc_otherInputDiv').classList.add('d-none');
+        document.getElementById('nc_chatLink').value = '';
+        newCaseModal.show();
+    }
+
+    function submitNewCase() {
+        const mainIdx = document.getElementById('nc_mainTopic').value;
+        if (mainIdx === "") return Toast.fire({icon:'warning', title:'ระบุหัวข้อหลัก'});
+        
+        const mainText = configData.topicData[parseInt(mainIdx)].main;
+        let activeSubs = Array.from(document.querySelectorAll('#nc_subTopicContainer .tag-selectable.active')).map(el => el.textContent);
+        
+        // Handle "Others" Text
+        if (activeSubs.includes(OTHERS_LABEL)) {
+            const otherText = document.getElementById('nc_otherDetail').value.trim();
+            // Remove raw label
+            activeSubs = activeSubs.filter(s => s !== OTHERS_LABEL);
+            // Append formatted string
+            activeSubs.push(`อื่นๆ: ${otherText || '-'}`);
+        }
+
+        const form = {
+            caseDate: document.getElementById('nc_caseDate').value, caseTime: document.getElementById('nc_caseTime').value,
+            maidId: document.getElementById('nc_maidId').value.trim(), maidName: document.getElementById('nc_maidName').value.trim(),
+            assignee: document.getElementById('nc_assignee').value,
+            chatLink: document.getElementById('nc_chatLink').value.trim(),
+            topicObj: { main: mainText, sub: activeSubs }
+        };
+        if(!form.maidId || !form.assignee) return Toast.fire({icon:'warning', title:'ระบุข้อมูลสำคัญ'});
+        setLoading('btnSubmitNewCase', true, 'กำลังเปิดเคส...');
+        google.script.run.withSuccessHandler(res => {
+            setLoading('btnSubmitNewCase', false);
+            if(res.success) { newCaseModal.hide(); loadData(false); Toast.fire({icon:'success', title:'สำเร็จ'}); }
+        }).createNewCase(form);
+    }
+
+    // --- New: Open Edit Modal ---
+    function openEditModal(id) {
+        const item = rawData.find(x => x.id === id);
+        if(!item) return;
+
+        document.getElementById('ec_id').value = item.id;
+        document.getElementById('ec_displayId').textContent = item.id;
+        document.getElementById('ec_maidId').value = item.maidId;
+        document.getElementById('ec_maidName').value = item.maidName;
+        document.getElementById('ec_chatLink').value = item.chatLink;
+        
+        // Parse current topic
+        let curMain = "", curSubs = [];
+        try { const tObj = JSON.parse(item.topic); curMain = tObj.main; curSubs = tObj.sub || []; } catch(e) { curMain = item.topic; }
+
+        const mainIdx = configData.topicData.findIndex(t => t.main === curMain);
+        if (mainIdx !== -1) {
+            document.getElementById('ec_mainTopic').value = mainIdx;
+            renderSubTopics('ec');
+            
+            // Re-select tags
+            const tags = document.querySelectorAll('#ec_subTopicContainer .tag-selectable');
+            const otherInput = document.getElementById('ec_otherDetail');
+            const otherDiv = document.getElementById('ec_otherInputDiv');
+            
+            tags.forEach(t => { 
+                const txt = t.textContent;
+                if(curSubs.includes(txt)) t.classList.add('active'); 
+                
+                // Check if we have "Others:" stored
+                if (txt === OTHERS_LABEL) {
+                    const foundOther = curSubs.find(s => s.startsWith("อื่นๆ:"));
+                    if (foundOther) {
+                        t.classList.add('active');
+                        otherDiv.classList.remove('d-none');
+                        otherInput.value = foundOther.replace("อื่นๆ: ", "");
+                    }
+                }
+            });
+        } else {
+            document.getElementById('ec_mainTopic').value = "";
+            document.getElementById('ec_subTopicContainer').innerHTML = "";
+        }
+        editCaseModal.show();
+    }
+
+    function submitEditCase() {
+        const mainIdx = document.getElementById('ec_mainTopic').value;
+        if (mainIdx === "") return Toast.fire({icon:'warning', title:'ระบุหัวข้อหลัก'});
+        const mainText = configData.topicData[parseInt(mainIdx)].main;
+        let activeSubs = Array.from(document.querySelectorAll('#ec_subTopicContainer .tag-selectable.active')).map(el => el.textContent);
+
+        // Handle "Others" Text
+        if (activeSubs.includes(OTHERS_LABEL)) {
+            const otherText = document.getElementById('ec_otherDetail').value.trim();
+            activeSubs = activeSubs.filter(s => s !== OTHERS_LABEL);
+            activeSubs.push(`อื่นๆ: ${otherText || '-'}`);
+        }
+
+        const form = {
+            id: document.getElementById('ec_id').value,
+            maidId: document.getElementById('ec_maidId').value.trim(),
+            maidName: document.getElementById('ec_maidName').value.trim(),
+            chatLink: document.getElementById('ec_chatLink').value.trim(),
+            topicObj: { main: mainText, sub: activeSubs }
+        };
+        setLoading('btnSubmitEditCase', true, 'กำลังบันทึก...');
+        google.script.run.withSuccessHandler(res => {
+            setLoading('btnSubmitEditCase', false);
+            if(res.success) { 
+                editCaseModal.hide(); 
+                loadData(false); 
+                Toast.fire({icon:'success', title:'แก้ไขสำเร็จ'}); 
+            } else {
+                Toast.fire({icon:'error', title:res.message});
+            }
+        }).updateCaseInfo(form);
+    }
+
+    function handleMaidIdInput() {
+        const val = document.getElementById('nc_maidId').value.trim().toLowerCase();
+        const match = maidDatabase.find(m => m.id === val);
+        if (match) document.getElementById('nc_maidName').value = match.name;
+        const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val));
+        const dl = document.getElementById('maidOptions'); dl.innerHTML = '';
+        filtered.slice(0, 20).forEach(m => dl.innerHTML += `<option value="${h(m.id)}">${h(m.name)}</option>`);
+    }
+
+    function handleEditMaidIdInput() {
+        const val = document.getElementById('ec_maidId').value.trim().toLowerCase();
+        const match = maidDatabase.find(m => m.id === val);
+        if (match) document.getElementById('ec_maidName').value = match.name;
+    }
+
+    function submitAddNewMaid() {
+        const id = document.getElementById('nc_maidId').value.trim();
+        const name = document.getElementById('nc_maidName').value.trim();
+        if(!id || !name) return Toast.fire({ icon: 'warning', title: 'ระบุข้อมูลให้ครบ' });
+        google.script.run.withSuccessHandler(() => { loadMaidData(); Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' }); }).addNewMaid(id, name);
+    }
+
+    function acceptCase(id, btn) {
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        google.script.run.withSuccessHandler(res => { if(res.success) loadData(false); }).acceptCase(id);
+    }
+
+    function openManageModal(id) {
+        const item = rawData.find(x => x.id === id);
+        if(!item) return;
+        document.getElementById('mc_id').value = id;
+        document.getElementById('mc_details').value = item.actionDetails || '';
+        manageCaseModal.show();
+    }
+
+    function submitUpdateDetails() {
+        const id = document.getElementById('mc_id').value;
+        const details = document.getElementById('mc_details').value.trim();
+        setLoading('btnUpdateDetails', true);
+        google.script.run.withSuccessHandler(() => { setLoading('btnUpdateDetails', false); manageCaseModal.hide(); loadData(false); }).updateActionDetails(id, details);
+    }
+
+    function submitCloseCase() {
+        const id = document.getElementById('mc_id').value;
+        const details = document.getElementById('mc_details').value.trim();
+        if(!details) return Toast.fire({ icon: 'warning', title: 'ระบุรายละเอียด' });
+        setLoading('btnCloseCase', true, 'กำลังปิดเคส...');
+        google.script.run.withSuccessHandler(() => { setLoading('btnCloseCase', false); manageCaseModal.hide(); loadData(false); }).closeCase(id, details);
+    }
+
+    function openReassign(id, current) {
+        document.getElementById('ra_id').value = id;
+        document.getElementById('ra_newAssignee').value = current;
+        document.getElementById('ra_note').value = ''; // Reset note
+        reassignModal.show();
+    }
+
+    function submitReassign() {
+        const id = document.getElementById('ra_id').value;
+        const target = document.getElementById('ra_newAssignee').value;
+        const note = document.getElementById('ra_note').value.trim(); // New Note
+        
+        setLoading('btnSubmitReassign', true, 'กำลังส่งต่อ...');
+        google.script.run.withSuccessHandler(() => { 
+            setLoading('btnSubmitReassign', false); 
+            reassignModal.hide(); 
+            loadData(false); 
+            Toast.fire({ icon: 'success', title: 'ส่งต่องานเรียบร้อย' });
+        }).reassignCase(id, target, note);
+    }
+
+    function loadMaidData() { google.script.run.withSuccessHandler(res => { maidDatabase = res || []; }).getAllMaids(); }
+
+    function updateDashboard(stats) {
+        document.getElementById('dashCountPending').textContent = `${stats.pending} เคส`;
+        document.getElementById('dashPctPending').textContent = `${stats.pendingPct}%`;
+        document.getElementById('dashCountProgress').textContent = `${stats.progress} เคส`;
+        document.getElementById('dashPctProgress').textContent = `${stats.progressPct}%`;
+        document.getElementById('dashCountClosed').textContent = `${stats.closed} เคส`;
+        document.getElementById('dashPctClosed').textContent = `${stats.closedPct}%`;
+        document.getElementById('totalCases').textContent = stats.total;
+    }
+  </script>
+</body>
+</html>
