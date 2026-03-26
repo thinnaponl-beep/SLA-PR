@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>Case Configuration</title>
+  
+  <!-- CSS Dependencies -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- JS Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <style>
+    :root { 
+        --ci-primary: #31C1D7; 
+        --ci-bg: #F8F9FA; 
+        --ci-text: #2d3436; 
+    }
+    body { 
+        font-family: 'Sarabun', sans-serif; 
+        background-color: var(--ci-bg); 
+        color: var(--ci-text); 
+    }
+    
+    /* Layout */
+    .top-bar { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        margin-bottom: 30px; 
+        padding-bottom: 15px; 
+        border-bottom: 1px dashed #e9ecef; 
+    }
+    
+    /* Cards */
+    .config-card { 
+        background: #fff; 
+        border: none; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03); 
+        height: 100%; 
+        overflow: hidden;
+    }
+    .config-header { 
+        background-color: var(--ci-primary); 
+        color: white; 
+        font-weight: 600; 
+        padding: 15px 20px; 
+        display: flex; 
+        align-items: center; 
+        gap: 10px; 
+    }
+    .config-header.alt { background-color: #f59e0b; }
+    .config-header.dark { background-color: #343a40; }
+    
+    /* Lists */
+    .list-group-item { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        padding: 12px 20px; 
+        border-color: #f1f5f9; 
+    }
+    
+    /* Buttons */
+    .btn-delete { 
+        color: #ef4444; 
+        background: rgba(239, 68, 68, 0.1); 
+        border: none; 
+        width: 32px; 
+        height: 32px; 
+        border-radius: 8px; 
+        transition: all 0.2s; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .btn-delete:hover { 
+        background: #ef4444; 
+        color: white; 
+        transform: scale(1.05); 
+    }
+
+    .btn-edit { 
+        color: #31C1D7; 
+        background: rgba(49, 193, 215, 0.1); 
+        border: none; 
+        width: 32px; 
+        height: 32px; 
+        border-radius: 8px; 
+        transition: all 0.2s; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 5px;
+    }
+    .btn-edit:hover { 
+        background: #31C1D7; 
+        color: white; 
+        transform: scale(1.05); 
+    }
+    
+    /* Temporary Tags for Sub Topics */
+    .temp-tag { 
+        background-color: #e2e8f0; 
+        color: #334155; 
+        padding: 4px 10px; 
+        border-radius: 20px; 
+        font-size: 0.9rem; 
+        margin-right: 5px; 
+        margin-bottom: 5px; 
+        display: inline-flex; 
+        align-items: center; 
+    }
+    .temp-tag i { 
+        cursor: pointer; 
+        margin-left: 8px; 
+        color: #94a3b8; 
+        font-size: 0.8rem; 
+    }
+    .temp-tag i:hover { color: #ef4444; }
+  </style>
+</head>
+<body class="p-4">
+  <div class="container-fluid max-w-6xl mx-auto">
+    
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <h3 class="fw-bold text-secondary mb-0">
+            <i class="fas fa-cogs me-2" style="color: var(--ci-primary);"></i>ตั้งค่าระบบ (Settings)
+        </h3>
+        <button class="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm" onclick="window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>?page=case'">
+            <i class="fas fa-arrow-left me-2"></i> กลับหน้าเคส
+        </button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-pills mb-4 gap-2" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill fw-bold" id="pills-admin-tab" data-bs-toggle="pill" data-bs-target="#pills-admin" type="button" role="tab">
+                <i class="fas fa-user-shield me-1"></i> ผู้รับผิดชอบ
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-topic-tab" data-bs-toggle="pill" data-bs-target="#pills-topic" type="button" role="tab">
+                <i class="fas fa-list-ul me-1"></i> หัวข้อเคส
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-super-tab" data-bs-toggle="pill" data-bs-target="#pills-super" type="button" role="tab">
+                <i class="fas fa-lock me-1"></i> Super Admin
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="pills-tabContent">
+        
+        <!-- Tab 1: Assignee Management -->
+        <div class="tab-pane fade show active" id="pills-admin" role="tabpanel">
+            <div class="config-card">
+                <div class="config-header">
+                    <i class="fas fa-user-shield fs-5"></i>
+                    <h5 class="mb-0">ผู้ได้รับมอบหมาย (Assignee)</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-5">
+                            <input type="text" id="newAdminName" class="form-control" placeholder="ชื่อ (Name)">
+                        </div>
+                        <div class="col-md-5">
+                            <input type="text" id="newAdminEmail" class="form-control" placeholder="อีเมล (Email)">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary w-100" onclick="addConfig('admin')">
+                                <i class="fas fa-plus me-1"></i> เพิ่ม
+                            </button>
+                        </div>
+                    </div>
+                    <ul class="list-group list-group-flush border rounded shadow-sm" id="adminList">
+                        <li class="list-group-item text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> กำลังโหลด...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Topic Management (Main & Sub) -->
+        <div class="tab-pane fade" id="pills-topic" role="tabpanel">
+            <div class="config-card">
+                <div class="config-header alt">
+                    <i class="fas fa-tags fs-5"></i>
+                    <h5 class="mb-0">หัวข้อติดต่อ (Main & Sub Topics)</h5>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <!-- Form Section -->
+                    <div class="bg-light p-3 rounded border mb-4">
+                        <h6 class="fw-bold text-secondary mb-3" id="topicFormTitle"><i class="fas fa-plus-circle me-2"></i>เพิ่มหัวข้อใหม่</h6>
+                        <input type="hidden" id="editingOldName" value="">
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">1. ระบุหัวข้อหลัก (Main Topic)</label>
+                            <input type="text" id="newTopic" class="form-control bg-white" placeholder="เช่น แจ้งซ่อม, เรื่องร้องเรียน">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">2. เพิ่มหัวข้อย่อย (Sub Items)</label>
+                            <div class="input-group">
+                                <input type="text" id="tempSubInput" class="form-control bg-white" placeholder="พิมพ์ชื่อหัวข้อย่อย แล้วกด Enter หรือปุ่มเพิ่ม..." onkeypress="if(event.key==='Enter') addTempSub()">
+                                <button class="btn btn-outline-secondary bg-white" type="button" onclick="addTempSub()">
+                                    <i class="fas fa-plus"></i> เพิ่มรายการ
+                                </button>
+                            </div>
+                            <!-- Area to show tags -->
+                            <div id="tempSubList" class="mt-2 p-2 border rounded bg-white d-flex flex-wrap align-items-center" style="min-height:45px;">
+                                <span class="text-muted small ps-2 fst-italic">ยังไม่มีรายการย่อย</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                             <button class="btn btn-warning flex-grow-1 fw-bold shadow-sm" id="btnSaveTopic" onclick="saveTopicConfig()">
+                                <i class="fas fa-save me-2"></i>บันทึกหัวข้อทั้งหมด
+                            </button>
+                            <button class="btn btn-secondary fw-bold shadow-sm d-none" id="btnCancelEdit" onclick="cancelEditTopic()">
+                                ยกเลิก
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4 text-muted opacity-25">
+                    
+                    <!-- List Section -->
+                    <h6 class="fw-bold text-secondary mb-3"><i class="fas fa-list me-2"></i>รายการหัวข้อปัจจุบัน</h6>
+                    <ul class="list-group list-group-flush border rounded shadow-sm" id="topicList">
+                        <li class="list-group-item text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> กำลังโหลด...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Super Admin Management -->
+        <div class="tab-pane fade" id="pills-super" role="tabpanel">
+            <div class="config-card">
+                <div class="config-header dark">
+                    <i class="fas fa-lock fs-5"></i>
+                    <h5 class="mb-0">ผู้มีสิทธิ์ตั้งค่า (Super Admin)</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-light border mb-4 small text-muted">
+                        <i class="fas fa-info-circle me-1"></i> ผู้ที่มีรายชื่อในหน้านี้ จะสามารถเข้าถึงเมนู "ตั้งค่า" และแก้ไขข้อมูลระบบได้
+                    </div>
+                    <div class="input-group mb-4">
+                        <span class="input-group-text bg-white"><i class="fas fa-envelope text-muted"></i></span>
+                        <input type="email" id="newSuperEmail" class="form-control" placeholder="ระบุอีเมล (Google Account)...">
+                        <button class="btn btn-dark" onclick="addConfig('super_admin')">
+                            <i class="fas fa-plus me-2"></i>เพิ่มสิทธิ์
+                        </button>
+                    </div>
+                    <ul class="list-group list-group-flush border rounded shadow-sm" id="superList">
+                        <li class="list-group-item text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> กำลังโหลด...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let tempSubTopics = [];
+    let isEditing = false;
+
+    window.onload = function() { loadConfigs(); };
+
+    function loadConfigs() {
+        google.script.run.withSuccessHandler(res => {
+            renderList('adminList', res.adminDetails, 'admin');
+            renderTopicList('topicList', res.topicData);
+            renderList('superList', res.superAdmins, 'super_admin');
+        }).withFailureHandler(err => {
+            Swal.fire('Error', 'ไม่สามารถโหลดข้อมูลได้: ' + err.message, 'error');
+        }).getCaseConfigs();
+    }
+
+    // --- Sub Topic Management (Client Side) ---
+    function addTempSub() {
+        const input = document.getElementById('tempSubInput');
+        const val = input.value.trim();
+        if(val) {
+            // Check duplicate
+            if(tempSubTopics.includes(val)) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'ซ้ำกัน',
+                    text: 'มีรายการนี้อยู่แล้ว',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                return;
+            }
+            tempSubTopics.push(val);
+            input.value = '';
+            renderTempSubs();
+        }
+    }
+
+    function removeTempSub(idx) {
+        tempSubTopics.splice(idx, 1);
+        renderTempSubs();
+    }
+
+    function renderTempSubs() {
+        const div = document.getElementById('tempSubList');
+        div.innerHTML = '';
+        if(tempSubTopics.length === 0) {
+            div.innerHTML = '<span class="text-muted small ps-2 fst-italic">ยังไม่มีรายการย่อย</span>';
+            return;
+        }
+        tempSubTopics.forEach((t, i) => {
+            div.innerHTML += `
+                <span class="temp-tag fade show">
+                    ${t} 
+                    <i class="fas fa-times-circle" onclick="removeTempSub(${i})" title="ลบ"></i>
+                </span>`;
+        });
+    }
+
+    // --- Main Lists ---
+    function renderList(elId, items, type) {
+        const ul = document.getElementById(elId); 
+        ul.innerHTML = "";
+        
+        if (!items || items.length === 0) { 
+            ul.innerHTML = `<li class="list-group-item text-center text-muted py-4"><i class="fas fa-box-open fs-4 mb-2 opacity-25"></i><br>ไม่มีข้อมูล</li>`; 
+            return; 
+        }
+        
+        items.forEach(item => {
+            let txt = item; 
+            let delVal = item; 
+            let sub = "";
+            
+            // Handle Object type (for Assignee: name & email)
+            if (typeof item === 'object') { 
+                txt = item.name; 
+                delVal = item.name; 
+                sub = item.email ? `<small class="text-muted ms-2"><i class="fas fa-envelope me-1"></i>${item.email}</small>` : ""; 
+            }
+            
+            // Clean string for JS function
+            const safeVal = String(delVal).replace(/'/g, "\\'");
+            
+            ul.innerHTML += `
+                <li class="list-group-item">
+                    <div>
+                        <span class="fw-bold text-dark">${txt}</span> ${sub}
+                    </div>
+                    <button class="btn-delete" onclick="removeConfig('${type}', '${safeVal}')" title="ลบรายการ">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </li>`;
+        });
+    }
+
+    function renderTopicList(elId, items) {
+        const ul = document.getElementById(elId); 
+        ul.innerHTML = "";
+        
+        if (!items || items.length === 0) { 
+            ul.innerHTML = `<li class="list-group-item text-center text-muted py-4"><i class="fas fa-box-open fs-4 mb-2 opacity-25"></i><br>ไม่มีข้อมูล</li>`; 
+            return; 
+        }
+        
+        items.forEach(item => {
+            // Render sub topics as badges
+            let subsHtml = "";
+            if (item.subs && item.subs.length > 0) {
+                subsHtml = item.subs.map(s => 
+                    `<span class="badge bg-secondary bg-opacity-10 text-secondary me-1 border" style="font-weight:400;">${s}</span>`
+                ).join('');
+            } else {
+                subsHtml = '<span class="text-muted small fst-italic">- ไม่มีข้อย่อย -</span>';
+            }
+            
+            const safeMain = String(item.main).replace(/'/g, "\\'");
+            // Safe JSON string for passing to edit
+            const safeSubs = encodeURIComponent(JSON.stringify(item.subs || []));
+
+            ul.innerHTML += `
+                <li class="list-group-item align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="fw-bold text-primary mb-1"><i class="fas fa-tag me-2"></i>${item.main}</div>
+                        <div class="mt-1 ps-4">${subsHtml}</div>
+                    </div>
+                    <div class="d-flex mt-1">
+                        <button class="btn-edit" onclick="startEditTopic('${safeMain}', '${safeSubs}')" title="แก้ไข">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="btn-delete" onclick="removeConfig('topic', '${safeMain}')" title="ลบ">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </li>`;
+        });
+    }
+
+    // --- Add / Edit Logic ---
+    function startEditTopic(main, subsEncoded) {
+        isEditing = true;
+        document.getElementById('editingOldName').value = main;
+        document.getElementById('newTopic').value = main;
+        try {
+            tempSubTopics = JSON.parse(decodeURIComponent(subsEncoded));
+        } catch(e) { tempSubTopics = []; }
+        
+        renderTempSubs();
+        
+        // Change UI to Edit Mode
+        document.getElementById('topicFormTitle').innerHTML = '<i class="fas fa-edit me-2"></i>แก้ไขหัวข้อ';
+        document.getElementById('btnSaveTopic').innerHTML = '<i class="fas fa-save me-2"></i>บันทึกการแก้ไข';
+        document.getElementById('btnSaveTopic').classList.replace('btn-warning', 'btn-info');
+        document.getElementById('btnSaveTopic').classList.add('text-white');
+        document.getElementById('btnCancelEdit').classList.remove('d-none');
+        
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEditTopic() {
+        isEditing = false;
+        document.getElementById('editingOldName').value = '';
+        document.getElementById('newTopic').value = '';
+        tempSubTopics = [];
+        renderTempSubs();
+        
+        // Reset UI to Add Mode
+        document.getElementById('topicFormTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>เพิ่มหัวข้อใหม่';
+        document.getElementById('btnSaveTopic').innerHTML = '<i class="fas fa-save me-2"></i>บันทึกหัวข้อทั้งหมด';
+        document.getElementById('btnSaveTopic').classList.replace('btn-info', 'btn-warning');
+        document.getElementById('btnSaveTopic').classList.remove('text-white');
+        document.getElementById('btnCancelEdit').classList.add('d-none');
+    }
+
+    function saveTopicConfig() {
+        const val = document.getElementById('newTopic').value.trim();
+        if(!val) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุหัวข้อหลัก', 'warning');
+        
+        const subVal = tempSubTopics.join(','); // Join array to string for backend
+        
+        Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        
+        if (isEditing) {
+            const oldName = document.getElementById('editingOldName').value;
+            google.script.run.withSuccessHandler(res => {
+                if(res.success) {
+                    cancelEditTopic(); 
+                    loadConfigs(); 
+                    Swal.fire({ icon: 'success', title: 'แก้ไขสำเร็จ', timer: 1000, showConfirmButton: false });
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }).updateCaseConfigTopic(oldName, val, subVal);
+        } else {
+            google.script.run.withSuccessHandler(res => {
+                if(res.success) {
+                    cancelEditTopic(); // Effectively resets form
+                    loadConfigs(); 
+                    Swal.fire({ icon: 'success', title: 'เพิ่มข้อมูลสำเร็จ', timer: 1000, showConfirmButton: false });
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }).addCaseConfigItem('topic', val, subVal);
+        }
+    }
+
+    function addConfig(type) {
+        if (type === 'topic') return; // Handled by saveTopicConfig
+        
+        let val = "";
+        if (type === 'admin') {
+            const n = document.getElementById('newAdminName').value.trim(); 
+            const e = document.getElementById('newAdminEmail').value.trim();
+            if(!n) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุชื่อผู้รับผิดชอบ', 'warning');
+            val = e ? `${n}|${e}` : n;
+        } 
+        else if (type === 'super_admin') {
+            val = document.getElementById('newSuperEmail').value.trim();
+            if(!val) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุอีเมล', 'warning');
+        }
+
+        Swal.fire({ 
+            title: 'กำลังบันทึก...', 
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading() 
+        });
+        
+        google.script.run.withSuccessHandler(res => {
+            if(res.success) {
+                // Clear Inputs
+                document.querySelectorAll('input').forEach(i => i.value='');
+                loadConfigs(); 
+                Swal.fire({ icon: 'success', title: 'เพิ่มข้อมูลสำเร็จ', timer: 1000, showConfirmButton: false });
+            } else {
+                Swal.fire('เกิดข้อผิดพลาด', res.message, 'error');
+            }
+        }).addCaseConfigItem(type, val, "");
+    }
+
+    function removeConfig(type, val) {
+        Swal.fire({ 
+            title: 'ยืนยันการลบ?', 
+            text: `ต้องการลบ "${val}" ใช่หรือไม่?`,
+            icon: 'warning', 
+            showCancelButton: true, 
+            confirmButtonColor: '#ef4444', 
+            confirmButtonText: 'ลบข้อมูล',
+            cancelButtonText: 'ยกเลิก'
+        }).then((r) => {
+            if (r.isConfirmed) {
+                Swal.fire({ title: 'Deleting...', didOpen: () => Swal.showLoading() });
+                google.script.run.withSuccessHandler((res) => { 
+                    if(res.success) {
+                        loadConfigs(); 
+                        Swal.fire({ icon: 'success', title: 'ลบสำเร็จ', timer: 1000, showConfirmButton: false });
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                }).removeCaseConfigItem(type, val);
+            }
+        });
+    }
+  </script>
+</body>
+</html>
