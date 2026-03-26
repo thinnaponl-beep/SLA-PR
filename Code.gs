@@ -9,7 +9,7 @@ const MAID_DB_SHEET_NAME = "Database_Maids";
 
 // --- Supabase Config ---
 const SUPABASE_URL = 'https://dkplpexwvhqkisuizenz.supabase.co'; 
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaXhkemdqYWl1cXFjaHh2cW5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0ODk0NzcsImV4cCI6MjA5MDA2NTQ3N30.iXZB-Fm2zWX0qT5jrr3_dC6OzeCYbVjGvgdZcNyo_Bk';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrcGxwZXh3dmhxa2lzdWl6ZW56Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDUwNjU0MywiZXhwIjoyMDkwMDgyNTQzfQ.ri8RM732_BMjPnmHL1Zq0zJRkkb8cNA7-MBFwFO9NDo';
 
 /**
  * 1. Entry Point: จัดการ Routing เพื่อแสดงหน้า Case, Config หรือ Dashboard
@@ -117,32 +117,58 @@ function supabaseRequest(endpoint, method = 'GET', payload = null) {
   if (payload) {
     options.payload = JSON.stringify(payload);
   }
+  
   const response = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + endpoint, options);
-  return JSON.parse(response.getContentText());
+  const statusCode = response.getResponseCode();
+  const responseText = response.getContentText();
+
+  // 🌟 เพิ่มการ Log เพื่อดักจับปัญหา 🌟
+  console.log(`[Supabase API] ${method} ${endpoint.split('?')[0]} | HTTP Status: ${statusCode}`);
+  
+  if (statusCode !== 200 && statusCode !== 201 && statusCode !== 204) {
+    console.error(`🚨 [Supabase Error] เกิดข้อผิดพลาดจากฐานข้อมูล:`, responseText);
+  } else if (responseText === "[]") {
+    console.warn(`⚠️ [Supabase Warning] ข้อมูลที่ได้กลับมาเป็นก้อนเปล่า [] -> หากคุณมั่นใจว่าใน Table มีข้อมูลอยู่ แปลว่าคุณน่าจะติดระบบ RLS (Row Level Security) ครับ ต้องไปเปิดให้ Read ได้ที่ Supabase`);
+  } else if (responseText.length > 2 && method === 'GET') {
+    // ขอไม่ Log ข้อมูลเต็มๆ เพื่อไม่ให้รกเกินไป
+    // console.log(`✅ [Supabase Success] ดึงข้อมูลสำเร็จ! ตัวอย่างข้อมูล:`, responseText.substring(0, 150) + "...");
+  }
+
+  // ป้องกัน Error จากการพยายาม Parse ค่าว่าง
+  if (!responseText) return null;
+  return JSON.parse(responseText);
 }
 
 function fetchCasesAsArray() {
-   // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-   const res = supabaseRequest('database_cases?select=*&limit=10000', 'GET');
+   console.log("กำลังเริ่มดึงข้อมูลจาก Supabase: Database_Cases...");
+   const res = supabaseRequest('Database_Cases?select=*&limit=10000', 'GET');
+   
+   if (res && res.error) {
+       console.error("❌ ดึงข้อมูลล้มเหลว:", res.error);
+       return [];
+   }
+
    if (res && !res.error && Array.isArray(res)) {
-       // เรียงตาม case_id จากใหม่ไปเก่า
-       res.sort((a, b) => b.case_id.localeCompare(a.case_id)); 
+       console.log(`✅ นำข้อมูลมาแปลงเป็น Array สำเร็จ ได้ทั้งหมด ${res.length} แถว`);
+       // เรียงตาม Case ID จากใหม่ไปเก่า
+       res.sort((a, b) => (b['Case ID'] || "").localeCompare(a['Case ID'] || "")); 
        return res.map(r => [
-           r.case_id || "", r.status || "", r.time_created || "", r.time_accepted || "", r.time_closed || "",
-           r.creator || "", r.assignee || "", r.maid_id || "", r.maid_name || "",
-           typeof r.topic === 'string' ? r.topic : JSON.stringify(r.topic || {}),
-           r.chat_link || "", r.action_details || "",
-           typeof r.history_logs === 'string' ? r.history_logs : JSON.stringify(r.history_logs || [])
+           r['Case ID'] || "", r['Status'] || "", r['Time_Created'] || "", r['Time_Accepted'] || "", r['Time_Closed'] || "",
+           r['Creator'] || "", r['Assignee'] || "", r['Maid ID'] || "", r['Maid Name'] || "",
+           typeof r['Topic'] === 'string' ? r['Topic'] : JSON.stringify(r['Topic'] || {}),
+           r['Chat Link'] || "", r['Action Details'] || "",
+           typeof r['History Logs'] === 'string' ? r['History Logs'] : JSON.stringify(r['History Logs'] || [])
        ]);
    }
+   console.warn("⚠️ รูปแบบข้อมูลที่ส่งกลับมาไม่ถูกต้อง หรือไม่ใช่ Array");
    return [];
 }
 
 function getCaseHistory(caseId) {
-   // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-   const res = supabaseRequest(`database_cases?case_id=eq.${caseId}&select=history_logs`, 'GET');
+   // 🌟 แปลงคอลัมน์ที่มีเว้นวรรคด้วย %22 (") และ %20 (Space) เพื่อส่ง API
+   const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}&select=%22History%20Logs%22`, 'GET');
    if (res && res.length > 0) {
-       let logs = res[0].history_logs;
+       let logs = res[0]['History Logs'];
        if (typeof logs === 'string') {
            try { return JSON.parse(logs); } catch(e) { return []; }
        }
@@ -151,18 +177,22 @@ function getCaseHistory(caseId) {
    return [];
 }
 
-
 // ------------------------------------------
 // --- MAID DATABASE FUNCTIONS ---
 // ------------------------------------------
 
 function getAllMaids() {
+  console.log("กำลังดึงข้อมูลแม่บ้านจาก Google Sheets...");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(MAID_DB_SHEET_NAME);
-  if (!sheet) return [];
+  if (!sheet) {
+    console.warn("⚠️ ไม่พบชีท MAID_DB_SHEET_NAME");
+    return [];
+  }
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   const data = sheet.getRange(2, 1, lastRow - 1, 2).getDisplayValues();
+  console.log(`✅ ดึงข้อมูลแม่บ้านสำเร็จ ได้ ${data.length} คน`);
   return data.map(r => ({ id: String(r[0]).trim(), name: String(r[1]).trim() })).filter(item => item.id !== "");
 }
 
@@ -381,6 +411,7 @@ function getCasesData() {
 
 function createNewCase(form) {
   try {
+    console.log("กำลังสร้างเคสใหม่...");
     const user = Session.getActiveUser().getEmail();
     
     let createdTimeStr;
@@ -395,10 +426,9 @@ function createNewCase(form) {
     const prefix = `CASE-${year}-`;
     let maxSeq = 0;
     
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const latestCase = supabaseRequest(`database_cases?select=case_id&case_id=like.${prefix}*&order=case_id.desc&limit=1`, 'GET');
-    if (latestCase && latestCase.length > 0) {
-        maxSeq = parseInt(latestCase[0].case_id.split('-')[2]);
+    const latestCase = supabaseRequest(`Database_Cases?select=%22Case%20ID%22&%22Case%20ID%22=like.${prefix}*&order=%22Case%20ID%22.desc&limit=1`, 'GET');
+    if (latestCase && latestCase.length > 0 && latestCase[0]['Case ID']) {
+        maxSeq = parseInt(latestCase[0]['Case ID'].split('-')[2]);
     }
     const caseId = `${prefix}${String(maxSeq + 1).padStart(4, '0')}`;
 
@@ -410,64 +440,74 @@ function createNewCase(form) {
     };
 
     const payload = {
-        case_id: caseId,
-        status: "รอการประสานงาน",
-        time_created: createdTimeStr,
-        time_accepted: null,
-        time_closed: null,
-        creator: user,
-        assignee: form.assignee,
-        maid_id: form.maidId,
-        maid_name: form.maidName,
-        topic: form.topicObj, 
-        chat_link: form.chatLink,
-        action_details: "",
-        history_logs: [newLog]
+        "Case ID": caseId,
+        "Status": "รอการประสานงาน",
+        "Time_Created": createdTimeStr,
+        "Time_Accepted": null,
+        "Time_Closed": null,
+        "Creator": user,
+        "Assignee": form.assignee,
+        "Maid ID": form.maidId,
+        "Maid Name": form.maidName,
+        // 🌟 ต้อง JSON.stringify แปลง Object/Array เป็น Text ก่อนยิงไป Supabase
+        "Topic": JSON.stringify(form.topicObj || {}), 
+        "Chat Link": form.chatLink,
+        "Action Details": "",
+        "History Logs": JSON.stringify([newLog]) 
     };
 
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const res = supabaseRequest('database_cases', 'POST', payload);
+    const res = supabaseRequest('Database_Cases', 'POST', payload);
     if (res && res.error) throw new Error(res.error.message);
     
+    console.log(`✅ สร้างเคส ${caseId} สำเร็จ`);
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; }
+  } catch (e) { 
+    console.error("🚨 Error (createNewCase):", e.toString());
+    return { success: false, message: e.toString() }; 
+  }
 }
 
 function acceptCase(caseId) {
   try {
+    console.log(`กำลังรับเคส: ${caseId}`);
     const user = Session.getActiveUser().getEmail();
     const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
     
-    // ดึง History เดิมมาเพิ่ม log
     const history = getCaseHistory(caseId);
     history.push({ timestamp: now, action: "Accept", user: user, details: "รับเคส" });
 
     const payload = {
-        status: "กำลังประสานงาน",
-        time_accepted: now,
-        history_logs: history
+        "Status": "กำลังประสานงาน",
+        "Time_Accepted": now,
+        // 🌟 ต้อง JSON.stringify แปลง Array เป็น Text ก่อน
+        "History Logs": JSON.stringify(history)
     };
 
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const res = supabaseRequest(`database_cases?case_id=eq.${caseId}`, 'PATCH', payload);
+    const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}`, 'PATCH', payload);
     if (res && res.error) throw new Error(res.error.message);
     
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; }
+  } catch (e) { 
+    console.error("🚨 Error (acceptCase):", e.toString());
+    return { success: false, message: e.toString() }; 
+  }
 }
 
 function updateActionDetails(caseId, details) {
   try {
-    const payload = { action_details: details };
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const res = supabaseRequest(`database_cases?case_id=eq.${caseId}`, 'PATCH', payload);
+    const payload = { "Action Details": details };
+    const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}`, 'PATCH', payload);
     if (res && res.error) throw new Error(res.error.message);
     return { success: true };
-  } catch (e) { return { success: false }; }
+  } catch (e) { 
+    console.error("🚨 Error (updateActionDetails):", e.toString());
+    return { success: false }; 
+  }
 }
 
 function updateCaseInfo(form) {
   try {
+    console.log(`กำลังอัปเดตข้อมูลเคส: ${form.id}`);
     const user = Session.getActiveUser().getEmail();
     const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
 
@@ -475,23 +515,27 @@ function updateCaseInfo(form) {
     history.push({ timestamp: now, action: "Edit", user: user, details: "แก้ไขข้อมูลเคส" });
 
     const payload = {
-        maid_id: form.maidId,
-        maid_name: form.maidName,
-        topic: form.topicObj,
-        chat_link: form.chatLink,
-        history_logs: history
+        "Maid ID": form.maidId,
+        "Maid Name": form.maidName,
+        // 🌟 ต้อง JSON.stringify แปลง Object/Array เป็น Text ก่อน
+        "Topic": JSON.stringify(form.topicObj || {}),
+        "Chat Link": form.chatLink,
+        "History Logs": JSON.stringify(history)
     };
 
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const res = supabaseRequest(`database_cases?case_id=eq.${form.id}`, 'PATCH', payload);
+    const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${form.id}`, 'PATCH', payload);
     if (res && res.error) throw new Error(res.error.message);
 
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; }
+  } catch (e) { 
+    console.error("🚨 Error (updateCaseInfo):", e.toString());
+    return { success: false, message: e.toString() }; 
+  }
 }
 
 function closeCase(caseId, details) {
   try {
+    console.log(`กำลังปิดเคส: ${caseId}`);
     const user = Session.getActiveUser().getEmail();
     const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
 
@@ -499,31 +543,34 @@ function closeCase(caseId, details) {
     history.push({ timestamp: now, action: "Close", user: user, details: "ปิดเคส: " + details.substring(0, 30) + "..." });
 
     const payload = {
-        status: "ปิดเคส",
-        time_closed: now,
-        action_details: details,
-        history_logs: history
+        "Status": "ปิดเคส",
+        "Time_Closed": now,
+        "Action Details": details,
+        // 🌟 ต้อง JSON.stringify แปลง Array เป็น Text ก่อน
+        "History Logs": JSON.stringify(history)
     };
 
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const res = supabaseRequest(`database_cases?case_id=eq.${caseId}`, 'PATCH', payload);
+    const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}`, 'PATCH', payload);
     if (res && res.error) throw new Error(res.error.message);
 
     return { success: true };
-  } catch (e) { return { success: false }; }
+  } catch (e) { 
+    console.error("🚨 Error (closeCase):", e.toString());
+    return { success: false }; 
+  }
 }
 
 function reassignCase(caseId, newAssignee, note) {
   try {
+    console.log(`กำลังส่งต่อเคส: ${caseId}`);
     const user = Session.getActiveUser().getEmail();
     const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
 
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const currentCase = supabaseRequest(`database_cases?case_id=eq.${caseId}&select=assignee,history_logs`, 'GET');
+    const currentCase = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}&select=%22Assignee%22,%22History%20Logs%22`, 'GET');
     if (!currentCase || currentCase.length === 0) throw new Error("Case Not Found");
 
-    const oldAssignee = currentCase[0].assignee;
-    let history = currentCase[0].history_logs;
+    const oldAssignee = currentCase[0]['Assignee'];
+    let history = currentCase[0]['History Logs'];
     if (typeof history === 'string') {
         try { history = JSON.parse(history); } catch(e) { history = []; }
     }
@@ -533,16 +580,19 @@ function reassignCase(caseId, newAssignee, note) {
     history.push({ timestamp: now, action: "Reassign", user: user, details: `ส่งต่อ: ${oldAssignee} -> ${newAssignee}${noteText}` });
 
     const payload = {
-        assignee: newAssignee,
-        history_logs: history
+        "Assignee": newAssignee,
+        // 🌟 ต้อง JSON.stringify แปลง Array เป็น Text ก่อน
+        "History Logs": JSON.stringify(history)
     };
 
-    // 🌟 เปลี่ยนชื่อตารางเป็นตัวพิมพ์เล็กทั้งหมด
-    const res = supabaseRequest(`database_cases?case_id=eq.${caseId}`, 'PATCH', payload);
+    const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}`, 'PATCH', payload);
     if (res && res.error) throw new Error(res.error.message);
 
     return { success: true };
-  } catch (e) { return { success: false }; }
+  } catch (e) { 
+    console.error("🚨 Error (reassignCase):", e.toString());
+    return { success: false }; 
+  }
 }
 
 // ------------------------------------------
