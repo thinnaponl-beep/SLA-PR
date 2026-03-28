@@ -1232,7 +1232,7 @@
             chatLink: document.getElementById('nc_chatLink').value.trim(),
             topicObj: { main: mainText, sub: activeSubs }
         };
-        if(!form.maidId || !form.assignee) return Toast.fire({icon:'warning', title:'ระบุข้อมูลสำคัญ'});
+        if(!form.maidId || !form.assignee || !form.maidName) return Toast.fire({icon:'warning', title:'ระบุข้อมูลสำคัญให้ครบถ้วน'});
         setLoading('btnSubmitNewCase', true, 'กำลังเปิดเคส...');
         google.script.run.withSuccessHandler(res => {
             setLoading('btnSubmitNewCase', false);
@@ -1306,6 +1306,7 @@
             chatLink: document.getElementById('ec_chatLink').value.trim(),
             topicObj: { main: mainText, sub: activeSubs }
         };
+        if(!form.maidId || !form.maidName) return Toast.fire({icon:'warning', title:'ระบุข้อมูลแม่บ้านให้ครบถ้วน'});
         setLoading('btnSubmitEditCase', true, 'กำลังบันทึก...');
         google.script.run.withSuccessHandler(res => {
             setLoading('btnSubmitEditCase', false);
@@ -1319,19 +1320,56 @@
         }).updateCaseInfo(form);
     }
 
+    // ==========================================
+    // --- UPDATED: MAID AUTOCOMPLETE LOGIC ---
+    // ==========================================
+
     function handleMaidIdInput() {
-        const val = document.getElementById('nc_maidId').value.trim().toLowerCase();
-        const match = maidDatabase.find(m => m.id === val);
-        if (match) document.getElementById('nc_maidName').value = match.name;
-        const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val));
-        const dl = document.getElementById('maidOptions'); dl.innerHTML = '';
-        filtered.slice(0, 20).forEach(m => dl.innerHTML += `<option value="${h(m.id)}">${h(m.name)}</option>`);
+        const idInput = document.getElementById('nc_maidId');
+        const nameInput = document.getElementById('nc_maidName');
+        const val = idInput.value.trim().toLowerCase();
+        
+        // 1. อัปเดตรายการแนะนำ (Datalist)
+        const dl = document.getElementById('maidOptions'); 
+        dl.innerHTML = '';
+        
+        if (val.length > 0) {
+            // ค้นหาทั้งรหัสและชื่อที่ "มีส่วนประกอบ" ของคำค้นหา
+            const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val));
+            filtered.slice(0, 20).forEach(m => dl.innerHTML += `<option value="${h(m.id)}">${h(m.name)}</option>`);
+            
+            // 2. ตรวจสอบว่าพิมพ์ตรงกับ Database พอดีเป๊ะๆ หรือไม่ (Exact Match)
+            const exactMatch = maidDatabase.find(m => m.id.toLowerCase() === val || m.name.toLowerCase() === val);
+            
+            if (exactMatch) {
+                // ถ้าตรงเป๊ะ (User เลือกจาก Datalist หรือพิมพ์จนครบ) -> เติมรหัสและชื่อให้สมบูรณ์
+                idInput.value = exactMatch.id;
+                nameInput.value = exactMatch.name;
+            } else {
+                // ถ้ายังพิมพ์ไม่เสร็จ หรือพิมพ์ค้างไว้ (Mismatch) -> ลบชื่อออกก่อน เพื่อป้องกันข้อมูลไม่ตรงกัน
+                nameInput.value = '';
+            }
+        } else {
+            nameInput.value = ''; // ถ้าช่องรหัสว่าง ก็ลบชื่อด้วย
+        }
     }
 
     function handleEditMaidIdInput() {
-        const val = document.getElementById('ec_maidId').value.trim().toLowerCase();
-        const match = maidDatabase.find(m => m.id === val);
-        if (match) document.getElementById('ec_maidName').value = match.name;
+        const idInput = document.getElementById('ec_maidId');
+        const nameInput = document.getElementById('ec_maidName');
+        const val = idInput.value.trim().toLowerCase();
+        
+        if (val.length > 0) {
+            const exactMatch = maidDatabase.find(m => m.id.toLowerCase() === val || m.name.toLowerCase() === val);
+            if (exactMatch) {
+                idInput.value = exactMatch.id;
+                nameInput.value = exactMatch.name;
+            } else {
+                nameInput.value = '';
+            }
+        } else {
+            nameInput.value = '';
+        }
     }
 
     function submitAddNewMaid() {
