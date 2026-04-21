@@ -8,8 +8,8 @@ const CASE_CONFIG_SHEET_NAME = "Config_Cases";
 const MAID_DB_SHEET_NAME = "Database_Maids"; 
 
 // --- Supabase Config ---
-const SUPABASE_URL = 'https://dkplpexwvhqkisuizenz.supabase.co'; 
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrcGxwZXh3dmhxa2lzdWl6ZW56Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDUwNjU0MywiZXhwIjoyMDkwMDgyNTQzfQ.ri8RM732_BMjPnmHL1Zq0zJRkkb8cNA7-MBFwFO9NDo';
+const SUPABASE_URL = ''; 
+const SUPABASE_KEY = '';
 
 /**
  * 1. Entry Point: จัดการ Routing เพื่อแสดงหน้า Case, Config หรือ Dashboard
