@@ -14,6 +14,10 @@
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
+  <!-- 🌟 NEW: Tom Select (สำหรับทำ Dropdown แบบพิมพ์ค้นหาได้) -->
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+  
   <style>
     :root { 
         --ci-primary: #31C1D7; 
@@ -232,11 +236,18 @@
         display: inline-block; 
     }
     
-    /* Timeline 4 Points Colors */
-    .dot-purple { background-color: #a855f7; } /* User Notify (Effective) */
-    .dot-blue { background-color: #3b82f6; }   /* System Open (Created) */
-    .dot-yellow { background-color: #f59e0b; } /* Accepted */
-    .dot-green { background-color: #22c55e; }  /* Closed */
+    .dot-purple { background-color: #a855f7; }
+    .dot-blue { background-color: #3b82f6; }   
+    .dot-yellow { background-color: #f59e0b; } 
+    .dot-green { background-color: #22c55e; }  
+
+    /* Custom Style for Tom Select to match Bootstrap shadow-sm */
+    .ts-control {
+        border: 1px solid #dee2e6;
+        box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
+        border-radius: 0.375rem;
+        padding: 0.4rem 0.75rem;
+    }
   </style>
 </head>
 <body class="p-4">
@@ -252,7 +263,6 @@
         </div>
         <div class="d-flex gap-2 align-items-center">
             
-            <!-- User Email Display -->
             <div class="text-end me-2 d-none d-md-block">
                 <div class="text-muted" style="font-size: 0.75rem;">Login as</div>
                 <div class="fw-bold text-primary" style="font-size: 0.85rem;" id="currentUserDisplay">Loading...</div>
@@ -280,14 +290,14 @@
                 <i class="fas fa-chart-pie me-1"></i> Dashboard
             </button>
 
-            <!-- Config Button (Hidden by default, shown if permission granted) -->
+            <!-- Config Button -->
             <button class="btn btn-outline-secondary fw-bold rounded-pill shadow-sm px-3 d-none" id="btnConfig" onclick="window.top.location.href = '<?= url ?>?page=config_case'">
                 <i class="fas fa-cog me-1"></i>ตั้งค่า
             </button>
         </div>
     </div>
 
-    <!-- Dashboard Cards (Click to Filter) -->
+    <!-- Dashboard Cards -->
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="dash-card dash-danger" id="card-pending" onclick="toggleStatusFilter('รอการประสานงาน')">
@@ -321,7 +331,6 @@
     <!-- Search & Filters -->
     <div class="d-flex justify-content-between mb-3 align-items-center">
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <!-- Search Box with Clear Button -->
             <div class="input-group shadow-sm" style="max-width: 250px;">
                 <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
                 <input type="text" class="form-control border-start-0 border-end-0 ps-0" id="searchInput" placeholder="ค้นหาข้อมูล..." onkeyup="renderTable()">
@@ -330,20 +339,17 @@
                 </button>
             </div>
 
-            <!-- New: Assignee Filter -->
-            <select class="form-select shadow-sm fw-bold text-secondary" id="filterAssignee" onchange="renderTable()" style="max-width: 180px;">
+            <!-- Assignee Filter (จะถูกแปลงเป็น Tom Select) -->
+            <select class="form-select shadow-sm fw-bold text-secondary" id="filterAssignee" style="max-width: 250px; min-width: 200px;">
                 <option value="all">👤 เจ้าหน้าที่ทุกคน</option>
             </select>
 
-            <!-- New: Date Filter -->
             <input type="date" class="form-control shadow-sm fw-bold text-secondary" id="filterDate" onchange="renderTable()" style="max-width: 150px;">
             
-            <!-- New: My Cases Button -->
             <button class="btn btn-outline-primary fw-bold rounded-pill px-3 shadow-sm" onclick="filterMyCases()">
                 <i class="fas fa-user-check me-1"></i> งานของฉัน
             </button>
 
-            <!-- Status Indicator -->
             <div id="filterIndicator" class="badge bg-secondary rounded-pill px-3 d-none" style="cursor:pointer;" onclick="toggleStatusFilter('all')">
                 สถานะ: <span id="activeStatusLabel"></span> <i class="fas fa-times ms-1"></i>
             </div>
@@ -362,7 +368,7 @@
             <thead>
                 <tr>
                     <th class="text-center">สถานะ / ID</th>
-                    <th>SLA Timeline (4 Points) <i class="fas fa-info-circle text-muted small ms-1" data-bs-toggle="tooltip" title="ม่วง:  เวลาที่Assign (User) | ฟ้า: เวลาที่เปิดเคส (System) | เหลือง: รับเคส | เขียว: ปิดงาน"></i></th>
+                    <th>SLA Timeline (4 Points)</th>
                     <th>ระยะเวลา</th>
                     <th>ผู้รับผิดชอบ</th>
                     <th>ข้อมูลแม่บ้าน</th>
@@ -405,7 +411,6 @@
                 <div class="col-md-6">
                     <label class="form-label small fw-bold text-muted">รหัสคุณแม่บ้าน <span class="text-danger">*</span></label>
                     <div class="input-group">
-                        <!-- Autocomplete Datalist -->
                         <input type="text" class="form-control shadow-sm" id="nc_maidId" placeholder="พิมพ์รหัส/ชื่อ..." list="maidOptions" autocomplete="off" oninput="handleMaidIdInput()">
                         <datalist id="maidOptions"></datalist>
                         <span class="input-group-text bg-white" id="maidLoadingIcon" style="display:none;"><i class="fas fa-spinner fa-spin text-primary"></i></span>
@@ -413,7 +418,6 @@
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small fw-bold text-muted">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-                    <!-- Input Group สำหรับพิมพ์ชื่อและปุ่มบันทึก -->
                     <div class="input-group">
                         <input type="text" class="form-control shadow-sm" id="nc_maidName" placeholder="ระบุชื่อแม่บ้าน...">
                         <button class="btn btn-outline-success" type="button" id="btnAddMaid" onclick="submitAddNewMaid()" title="บันทึกแม่บ้านใหม่ลงฐานข้อมูล">
@@ -421,32 +425,27 @@
                         </button>
                     </div>
                 </div>
+                
                 <div class="col-12">
                     <label class="form-label small fw-bold text-muted">ผู้รับผิดชอบเคส <span class="text-danger">*</span></label>
-                    <select class="form-select shadow-sm" id="nc_assignee">
-                        <option value="" selected disabled>กำลังโหลดรายชื่อ...</option>
-                    </select>
+                    <select id="nc_assignee" placeholder="พิมพ์ชื่อเพื่อค้นหา..."></select>
                 </div>
                 
-                <!-- Topic Selection: Main & Sub -->
                 <div class="col-12">
-                    <label class="form-label small fw-bold text-muted">หัวข้อหลัก <span class="text-danger">*</span></label>
-                    <select class="form-select shadow-sm mb-2" id="nc_mainTopic" onchange="renderSubTopics('nc')">
-                        <option value="" selected disabled>-- เลือกหัวข้อหลัก --</option>
-                    </select>
+                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อหลัก <span class="text-danger">*</span></label>
+                    <select id="nc_mainTopic" placeholder="พิมพ์หัวข้อเพื่อค้นหา..."></select>
                     
-                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อย่อย (เลือกได้หลายข้อ)</label>
-                    <div id="nc_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light" style="min-height: 50px;">
+                    <label class="form-label small fw-bold text-muted mt-3">หัวข้อย่อย (เลือกได้หลายข้อ)</label>
+                    <div id="nc_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light shadow-sm" style="min-height: 50px;">
                         <span class="text-muted small align-self-center ps-2">กรุณาเลือกหัวข้อหลักก่อน</span>
                     </div>
                     
-                    <!-- Others Input (Hidden by default) -->
                     <div id="nc_otherInputDiv" class="mt-2 d-none">
                         <input type="text" id="nc_otherDetail" class="form-control shadow-sm" placeholder="โปรดระบุรายละเอียดเพิ่มเติม...">
                     </div>
                 </div>
 
-                <div class="col-12">
+                <div class="col-12 mt-3">
                     <label class="form-label small fw-bold text-muted">Link Chat (beneat-chat)</label>
                     <input type="url" class="form-control shadow-sm" id="nc_chatLink" placeholder="วางลิงก์ห้องแชท...">
                 </div>
@@ -485,21 +484,19 @@
                     <input type="text" class="form-control shadow-sm" id="ec_maidName">
                 </div>
                 
-                <!-- Topic Selection Edit -->
                 <div class="col-12">
-                    <label class="form-label small fw-bold text-muted">หัวข้อหลัก</label>
-                    <select class="form-select shadow-sm mb-2" id="ec_mainTopic" onchange="renderSubTopics('ec')"></select>
+                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อหลัก</label>
+                    <select id="ec_mainTopic" placeholder="พิมพ์หัวข้อเพื่อค้นหา..."></select>
                     
-                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อย่อย</label>
-                    <div id="ec_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light" style="min-height: 50px;"></div>
+                    <label class="form-label small fw-bold text-muted mt-3">หัวข้อย่อย</label>
+                    <div id="ec_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light shadow-sm" style="min-height: 50px;"></div>
                     
-                    <!-- Others Input Edit -->
                     <div id="ec_otherInputDiv" class="mt-2 d-none">
                         <input type="text" id="ec_otherDetail" class="form-control shadow-sm" placeholder="โปรดระบุรายละเอียดเพิ่มเติม...">
                     </div>
                 </div>
 
-                <div class="col-12">
+                <div class="col-12 mt-3">
                     <label class="form-label small fw-bold text-muted">Link Chat</label>
                     <input type="url" class="form-control shadow-sm" id="ec_chatLink">
                 </div>
@@ -566,10 +563,10 @@
             <input type="hidden" id="ra_id">
             <div class="mb-3">
                 <label class="form-label small fw-bold">มอบหมายงานให้กับ:</label>
-                <select class="form-select shadow-sm" id="ra_newAssignee"></select>
+                <select id="ra_newAssignee" placeholder="พิมพ์ชื่อเพื่อค้นหา..."></select>
             </div>
             <div class="mb-3">
-                <label class="form-label small fw-bold">หมายเหตุ / ฝากข้อความ (Note):</label>
+                <label class="form-label small fw-bold mt-2">หมายเหตุ / ฝากข้อความ (Note):</label>
                 <textarea class="form-control shadow-sm" id="ra_note" rows="3" placeholder="ระบุเหตุผล หรือสิ่งที่ต้องทำต่อ..."></textarea>
             </div>
         </div>
@@ -584,6 +581,31 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // --- Global Variables ---
+    if (typeof google === 'undefined') {
+      console.warn("Running outside Google Apps Script environment. Mocking google.script.run.");
+      window.google = {
+        script: {
+          get run() {
+            let successCb, failureCb;
+            const chain = {
+              withSuccessHandler: function(cb) { successCb = cb; return chain; },
+              withFailureHandler: function(cb) { failureCb = cb; return chain; },
+              getCasesData: function() { setTimeout(() => successCb && successCb({ data: [], currentUser: 'test@local', canConfig: true, configs: { admins: [], topicData: [], adminDetails: [] } }), 500); },
+              getAllMaids: function() { setTimeout(() => successCb && successCb([]), 500); },
+              createNewCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
+              updateCaseInfo: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
+              addNewMaid: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
+              acceptCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
+              updateActionDetails: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
+              closeCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
+              reassignCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); }
+            };
+            return chain;
+          }
+        }
+      };
+    }
+
     let rawData = [];
     let configData = { admins: [], topicData: [], adminDetails: [] }; 
     let currentStatusFilter = 'all'; 
@@ -591,139 +613,115 @@
     let currentUserEmail = "";
     let maidDatabase = []; 
     let readCases = []; 
+    let tsInstances = {}; // 🌟 เก็บตัวแปรสำหรับ Searchable Dropdown (Tom Select)
     const OTHERS_LABEL = "อื่นๆ (โปรดระบุ)";
 
     const Toast = Swal.mixin({
       toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar: true
     });
 
-    /**
-     * Helper: Sanitize HTML to prevent injection
-     */
     function h(str) {
         if (str === null || str === undefined) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;')
-            .replace(/`/g, '&#96;')
-            .replace(/\$/g, '&#36;');
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
     }
     
-    /**
-     * Helper: Escape String for JS arguments in onclick
-     */
     function escapeJs(str) {
         if (!str) return '';
-        return String(str)
-            .replace(/\\/g, '\\\\')
-            .replace(/'/g, "\\'")
-            .replace(/"/g, '\\"')
-            .replace(/\n/g, '\\n')
-            .replace(/\r/g, '');
+        return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '');
     }
 
-    /**
-     * Helper: Parse Date (dd/MM/yyyy HH:mm:ss) with BE 25xx support
-     */
     function parseDateTime(s) {
-        if (!s || typeof s !== 'string') return 0;
-        try {
-            const parts = s.split(' ');
-            if (parts.length < 2) return 0;
-            const dateParts = parts[0].split('/');
-            const timeParts = parts[1].split(':');
-            if (dateParts.length !== 3) return 0;
-            
-            let d = parseInt(dateParts[0], 10);
-            let m = parseInt(dateParts[1], 10) - 1;
-            let y = parseInt(dateParts[2], 10);
-            
-            if (y > 2400) y -= 543; // Convert BE to AD
+        if (!s) return 0;
+        let str = String(s).trim();
+        if (str === "" || str === "-" || str.toLowerCase() === "null") return 0;
+        
+        let d = new Date(str);
+        if (!isNaN(d.getTime())) {
+            if (d.getFullYear() > 2400) d.setFullYear(d.getFullYear() - 543);
+            return d.getTime();
+        }
 
-            let h = parseInt(timeParts[0], 10) || 0;
-            let min = parseInt(timeParts[1], 10) || 0;
-            let sec = timeParts[2] ? parseInt(timeParts[2], 10) : 0;
+        try {
+            str = str.replace('T', ' ');
+            const parts = str.split(' ');
             
-            return new Date(y, m, d, h, min, sec).getTime();
-        } catch (e) { return 0; }
+            let timeParts = ['00', '00', '00'];
+            if (parts.length > 1) {
+                timeParts = parts[1].split(':');
+            }
+            
+            let y, m, day;
+            if (parts[0].includes('/')) { 
+                const dParts = parts[0].split('/');
+                if(dParts.length !== 3) return 0;
+                day = parseInt(dParts[0], 10);
+                m = parseInt(dParts[1], 10) - 1; 
+                y = parseInt(dParts[2], 10);
+            } else if (parts[0].includes('-')) { 
+                const dParts = parts[0].split('-');
+                if(dParts.length !== 3) return 0;
+                y = parseInt(dParts[0], 10);
+                m = parseInt(dParts[1], 10) - 1;
+                day = parseInt(dParts[2], 10);
+            } else {
+                return 0;
+            }
+            
+            if (y > 2400) y -= 543;
+            
+            const h = parseInt(timeParts[0], 10) || 0;
+            const min = parseInt(timeParts[1], 10) || 0;
+            const sec = parseInt(timeParts[2], 10) || 0;
+            
+            return new Date(y, m, day, h, min, sec).getTime();
+        } catch(e) { return 0; }
     }
-    
-    // Check if date is Today (based on System Time)
-    function checkIsToday(sysTimeStr) {
-        const ts = parseDateTime(sysTimeStr);
-        if (ts === 0) return false;
-        const d = new Date(ts);
-        const now = new Date();
-        return d.getDate() === now.getDate() &&
-               d.getMonth() === now.getMonth() &&
-               d.getFullYear() === now.getFullYear();
-    }
-    
-    // Check if date is matches the filter date
+
     function checkDateMatch(sysTimeStr, filterDateVal) {
-        if (!filterDateVal) return true; // No filter
+        if (!filterDateVal) return true; 
         const ts = parseDateTime(sysTimeStr);
         if (ts === 0) return false;
         
         const d = new Date(ts);
         const [fYear, fMonth, fDay] = filterDateVal.split('-');
         
-        return d.getDate() === parseInt(fDay) &&
-               (d.getMonth() + 1) === parseInt(fMonth) &&
-               d.getFullYear() === parseInt(fYear);
+        return d.getDate() === parseInt(fDay, 10) &&
+               (d.getMonth() + 1) === parseInt(fMonth, 10) &&
+               d.getFullYear() === parseInt(fYear, 10);
     }
     
-    // Smart Time Display
     function smartTime(dateTimeStr) {
-        if (!dateTimeStr) return '--:--';
-        const ts = parseDateTime(dateTimeStr);
-        if (ts === 0) return '--:--';
-        const d = new Date(ts);
-        const now = new Date();
-        
-        const isToday = d.getDate() === now.getDate() && 
-                        d.getMonth() === now.getMonth() && 
-                        d.getFullYear() === now.getFullYear();
-        
-        const yest = new Date(now);
-        yest.setDate(now.getDate() - 1);
-        const isYesterday = d.getDate() === yest.getDate() && 
-                            d.getMonth() === yest.getMonth() && 
-                            d.getFullYear() === yest.getFullYear();
-
-        const timePart = dateTimeStr.split(' ')[1] ? dateTimeStr.split(' ')[1].substring(0, 5) : '';
-
-        if (isToday) {
-            return timePart;
-        } else if (isYesterday) {
-            return `<span class="badge bg-light text-secondary border fw-normal" style="font-size:0.65em; padding: 2px 4px;">เมื่อวาน ${timePart}</span>`;
-        } else {
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            return `<span class="badge bg-light text-secondary border fw-normal" style="font-size:0.65em; padding: 2px 4px;">${dd}/${mm} ${timePart}</span>`;
+        if (!dateTimeStr) return '<span class="text-muted opacity-50">--:--</span>';
+        const str = String(dateTimeStr).trim();
+        if (str === "" || str === "-" || str.toLowerCase() === "null") {
+            return '<span class="text-muted opacity-50">--:--</span>';
         }
+        
+        const ts = parseDateTime(str);
+        if (ts === 0) return '<span class="text-muted opacity-50">--:--</span>';
+        
+        const d = new Date(ts);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        
+        const displayStr = `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+        return `<span class="badge bg-light text-secondary border fw-normal shadow-sm" style="font-size:0.7em; padding: 3px 6px;">${displayStr}</span>`;
     }
 
-    // Helper: Calculate Hour Difference
     function getHoursDiff(dateTimeStr) {
         if (!dateTimeStr) return 0;
         const target = parseDateTime(dateTimeStr);
         if (target === 0) return 0;
         return (new Date().getTime() - target) / (1000 * 60 * 60);
     }
-    
-    function isOver12Hours(dateTimeStr) {
-        return getHoursDiff(dateTimeStr) > 12;
-    }
 
-    // Calc Duration: System Start -> End
     function calculateDuration(startStr, endStr) {
         if (!startStr) return '-';
         const start = parseDateTime(startStr);
-        const end = (endStr && endStr !== "") ? parseDateTime(endStr) : new Date().getTime();
+        const end = (endStr && String(endStr).toLowerCase() !== "null" && endStr !== "") ? parseDateTime(endStr) : new Date().getTime();
         
         if (start === 0) return '-';
 
@@ -787,13 +785,15 @@
 
     function filterMyCases() {
         if (currentUserEmail) {
-            document.getElementById('filterAssignee').value = currentUserEmail;
+            if (tsInstances['filterAssignee']) {
+                tsInstances['filterAssignee'].setValue(currentUserEmail);
+            } else {
+                document.getElementById('filterAssignee').value = currentUserEmail;
+            }
             renderTable();
             Toast.fire({ icon: 'success', title: 'แสดงงานของคุณแล้ว' });
         }
     }
-
-    // --- Main Logic ---
 
     window.onload = function() {
         newCaseModal = new bootstrap.Modal(document.getElementById('newCaseModal'));
@@ -814,7 +814,6 @@
         google.script.run.withSuccessHandler(res => {
             if(full) Swal.close();
             
-            // Updated: Parse System Time from Logs for Filtering
             rawData = (res.data || []).map(item => {
                 let sysTime = item.timeCreated; 
                 try {
@@ -829,7 +828,6 @@
             currentUserEmail = res.currentUser;
             document.getElementById('currentUserDisplay').textContent = currentUserEmail;
             
-            // Show Config Button if permitted
             if (res.canConfig) {
                 document.getElementById('btnConfig').classList.remove('d-none');
             }
@@ -842,10 +840,8 @@
         }).getCasesData();
     }
 
-    // Helper to render topic nicely
     function getTopicHtml(topicRaw) {
         try {
-            // Try parsing JSON
             const tObj = JSON.parse(topicRaw);
             if (tObj && tObj.main) {
                 let html = `<div class="topic-main-badge">${h(tObj.main)}</div>`;
@@ -859,13 +855,11 @@
                 return html;
             }
         } catch (e) {
-            // Legacy string
             return `<span class="badge bg-light text-dark border-0 shadow-sm">${h(topicRaw)}</span>`;
         }
         return '-';
     }
 
-    // Also need to get plain text for search
     function getTopicText(topicRaw) {
         try {
             const tObj = JSON.parse(topicRaw);
@@ -876,14 +870,12 @@
 
     function renderTable() {
         const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
-        // New Filters
         const fAssignee = document.getElementById('filterAssignee').value;
         const fDate = document.getElementById('filterDate').value;
 
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
         
-        // Smart Search: If searching for Case ID, ignore other filters
         const isIdSearch = searchText.startsWith('case-');
 
         const filtered = rawData.filter(item => {
@@ -891,11 +883,9 @@
             const matchesSearch = searchPool.includes(searchText);
             
             if (isIdSearch) {
-                // If searching by ID, only check search match
                 return matchesSearch;
             }
             
-            // Standard Filters
             const matchesStatus = (currentStatusFilter === 'all' || item.status === currentStatusFilter);
             const matchesAssignee = (fAssignee === 'all' || item.assignee.trim() === fAssignee.trim());
             const matchesDate = checkDateMatch(item.systemCreatedTime, fDate);
@@ -911,7 +901,6 @@
         filtered.forEach(item => {
             let badge = item.status === 'รอการประสานงาน' ? 'bg-status-pending' : (item.status === 'กำลังประสานงาน' ? 'bg-status-progress' : 'bg-status-closed');
             
-            // Use ID for function calls to prevent syntax errors from special chars in other fields
             const clickId = escapeJs(item.id);
             const safeAssignee = escapeJs(item.assignee);
             
@@ -926,16 +915,10 @@
             if (item.status !== 'ปิดเคส') {
                 actions += `<button class="btn btn-sm btn-link text-muted p-0 w-100 text-decoration-none" style="font-size:0.7rem;" onclick="openReassign('${clickId}', '${safeAssignee}')">ส่งต่อ</button>`;
             }
-            // ปุ่มประวัติ และ ปุ่มแก้ไข
             actions += `<div class="d-flex justify-content-center gap-2 mt-1">
                           <button class="btn btn-sm btn-link text-secondary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openHistoryModal('${clickId}')"><i class="fas fa-history me-1"></i>ประวัติ</button>
                           ${item.status !== 'ปิดเคส' ? `<button class="btn btn-sm btn-link text-primary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openEditModal('${clickId}')"><i class="fas fa-pen"></i></button>` : ''}
                         </div>`;
-            
-            const t1 = smartTime(item.timeCreated); 
-            const t2 = smartTime(item.systemCreatedTime); 
-            const t3 = smartTime(item.timeAccepted); 
-            const t4 = smartTime(item.timeClosed); 
             
             const profileUrl = item.maidId ? `https://admin-test.beneat.co/professional/${item.maidId.trim()}/profile` : '#';
 
@@ -994,13 +977,11 @@
             const tNotify = parseDateTime(item.timeCreated);
             const tSystem = parseDateTime(item.systemCreatedTime);
             
-            // 1. Logic แชทรอนาน
             if (tNotify > 0 && tSystem > 0) {
                 const diffHours = (tSystem - tNotify) / (1000 * 60 * 60);
                 if (diffHours > 3) isChatWaitLong = true;
             }
 
-            // 2. Logic LATE
             let isLate = false;
             if (item.status === 'กำลังประสานงาน') {
                 const hoursWorking = getHoursDiff(item.timeAccepted);
@@ -1011,17 +992,13 @@
                 if (hoursPending > 2) isLate = true;
             }
 
-            // 3. Find Reassign Note (NEW)
             let reassignNote = "";
             try {
                 const logs = JSON.parse(item.historyLogs || "[]");
-                // Find last Reassign log
                 const lastReassign = [...logs].reverse().find(l => l.action === 'Reassign');
                 if (lastReassign && lastReassign.details) {
                     const detailStr = lastReassign.details;
-                    // Check if current user is the target of reassign
                     if (detailStr.includes(currentUserEmail) || detailStr.includes(getDisplayName(currentUserEmail))) {
-                         // Extract text inside (Note: ...) if present
                          const match = detailStr.match(/\(Note: (.*)\)/);
                          if (match) {
                              reassignNote = match[1];
@@ -1053,7 +1030,6 @@
                      badgeHtml += '<span class="badge bg-danger p-1 ms-1" style="font-size:8px;">LATE</span>';
                 }
 
-                // Show Note if available
                 let noteHtml = '';
                 if (item.reassignNote) {
                     noteHtml = `<div class="mt-1 small text-info"><i class="fas fa-sticky-note me-1"></i>"${h(item.reassignNote)}"</div>`;
@@ -1084,8 +1060,7 @@
 
     function handleNotiClick(caseId) {
         document.getElementById('searchInput').value = caseId;
-        // Reset filters to ensure case is found
-        document.getElementById('filterAssignee').value = 'all';
+        if(tsInstances['filterAssignee']) tsInstances['filterAssignee'].setValue('all');
         document.getElementById('filterDate').value = '';
         currentStatusFilter = 'all';
         if (!readCases.includes(caseId)) readCases.push(caseId);
@@ -1108,7 +1083,6 @@
                 const iconMap = { Create: 'fa-plus-circle text-primary', Accept: 'fa-hand-paper text-warning', Close: 'fa-check-circle text-success', Reassign: 'fa-exchange-alt text-info', Edit: 'fa-pen text-secondary' };
                 const actionMap = { Create: 'เปิดเคส', Accept: 'รับเคส', Close: 'ปิดเคส', Reassign: 'ส่งต่องาน', Edit: 'แก้ไขข้อมูล' };
                 
-                // Card UI
                 container.innerHTML += `
                     <div class="history-card ${log.action}">
                         <div class="d-flex align-items-start">
@@ -1131,10 +1105,19 @@
         historyModal.show();
     }
 
+    // 🌟 NEW: สร้างฟังก์ชันทำลายและสร้าง Tom Select ให้ Dropdown ใหม่ 🌟
     function populateConfigDropdowns(configs) {
-        // Populate New Case Assignee
-        let opts = `<option value="" selected disabled>-- เลือกผู้รับผิดชอบ --</option>`;
-        let optsFilter = `<option value="all">👤 เจ้าหน้าที่ทุกคน</option>`; // Filter Options
+        
+        // เคลียร์ปลั๊กอินค้นหาของเก่าออกก่อน (ป้องกันบั๊กซ้อนกัน)
+        ['nc_assignee', 'ra_newAssignee', 'filterAssignee', 'nc_mainTopic', 'ec_mainTopic'].forEach(id => {
+            if (tsInstances[id]) {
+                tsInstances[id].destroy();
+                delete tsInstances[id];
+            }
+        });
+
+        let opts = `<option value="" selected disabled></option>`;
+        let optsFilter = `<option value="all">👤 เจ้าหน้าที่ทุกคน</option>`; 
         
         if (configs.adminDetails && configs.adminDetails.length > 0) {
             configs.adminDetails.forEach(a => {
@@ -1151,22 +1134,40 @@
         
         document.getElementById('nc_assignee').innerHTML = opts;
         document.getElementById('ra_newAssignee').innerHTML = opts;
-        document.getElementById('filterAssignee').innerHTML = optsFilter; // Update Filter Dropdown
+        document.getElementById('filterAssignee').innerHTML = optsFilter; 
 
-        // Populate Topic Main
-        let opT = `<option value="" selected disabled>-- เลือกหัวข้อหลัก --</option>`;
+        let opT = `<option value="" selected disabled></option>`;
         configs.topicData.forEach((t, idx) => { opT += `<option value="${idx}">${h(t.main)}</option>`; });
         document.getElementById('nc_mainTopic').innerHTML = opT;
         document.getElementById('ec_mainTopic').innerHTML = opT;
+
+        // --- เริ่มต้นใช้งาน Tom Select ---
+        const baseTsConfig = { create: false, controlInput: '<input>' };
+
+        tsInstances['nc_assignee'] = new TomSelect('#nc_assignee', baseTsConfig);
+        tsInstances['ra_newAssignee'] = new TomSelect('#ra_newAssignee', baseTsConfig);
+        
+        tsInstances['filterAssignee'] = new TomSelect('#filterAssignee', {
+            ...baseTsConfig,
+            onChange: function() { renderTable(); }
+        });
+
+        tsInstances['nc_mainTopic'] = new TomSelect('#nc_mainTopic', {
+            ...baseTsConfig,
+            onChange: function() { renderSubTopics('nc'); }
+        });
+
+        tsInstances['ec_mainTopic'] = new TomSelect('#ec_mainTopic', {
+            ...baseTsConfig,
+            onChange: function() { renderSubTopics('ec'); }
+        });
     }
 
-    // --- Topic Logic (Main + Sub) ---
     function renderSubTopics(prefix) {
         const mainIdx = document.getElementById(`${prefix}_mainTopic`).value;
         const container = document.getElementById(`${prefix}_subTopicContainer`);
         container.innerHTML = '';
         
-        // Hide Others Input if changing main topic
         const otherDiv = document.getElementById(`${prefix}_otherInputDiv`);
         otherDiv.classList.add('d-none');
         document.getElementById(`${prefix}_otherDetail`).value = '';
@@ -1174,8 +1175,6 @@
         if (mainIdx === "" || mainIdx === null) return;
         
         const subs = [...(configData.topicData[parseInt(mainIdx)].subs || [])];
-        
-        // 1. Auto add "Others" option
         subs.push(OTHERS_LABEL);
 
         if (!subs || subs.length === 0) { container.innerHTML = '<span class="text-muted small ps-2">ไม่มีหัวข้อย่อย</span>'; return; }
@@ -1186,7 +1185,6 @@
             el.textContent = sub;
             el.onclick = function() { 
                 this.classList.toggle('active'); 
-                // Toggle "Others" input
                 if (sub === OTHERS_LABEL) {
                     if (this.classList.contains('active')) otherDiv.classList.remove('d-none');
                     else otherDiv.classList.add('d-none');
@@ -1198,11 +1196,22 @@
 
     function openNewCaseModal() {
         const now = new Date();
-        document.getElementById('nc_caseDate').value = now.toISOString().split('T')[0];
-        document.getElementById('nc_caseTime').value = now.toTimeString().slice(0,5);
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+
+        document.getElementById('nc_caseDate').value = `${year}-${month}-${day}`;
+        document.getElementById('nc_caseTime').value = `${hours}:${mins}`;
+        
         document.getElementById('nc_maidId').value = '';
         document.getElementById('nc_maidName').value = '';
-        document.getElementById('nc_mainTopic').value = ""; 
+
+        // 🌟 เคลียร์ค่า Dropdown ทิ้งเมื่อเปิด Modal ใหม่ 🌟
+        if(tsInstances['nc_mainTopic']) tsInstances['nc_mainTopic'].setValue(""); 
+        if(tsInstances['nc_assignee']) tsInstances['nc_assignee'].setValue(""); 
+
         document.getElementById('nc_subTopicContainer').innerHTML = '<span class="text-muted small align-self-center ps-2">กรุณาเลือกหัวข้อหลักก่อน</span>';
         document.getElementById('nc_otherInputDiv').classList.add('d-none');
         document.getElementById('nc_chatLink').value = '';
@@ -1216,12 +1225,9 @@
         const mainText = configData.topicData[parseInt(mainIdx)].main;
         let activeSubs = Array.from(document.querySelectorAll('#nc_subTopicContainer .tag-selectable.active')).map(el => el.textContent);
         
-        // Handle "Others" Text
         if (activeSubs.includes(OTHERS_LABEL)) {
             const otherText = document.getElementById('nc_otherDetail').value.trim();
-            // Remove raw label
             activeSubs = activeSubs.filter(s => s !== OTHERS_LABEL);
-            // Append formatted string
             activeSubs.push(`อื่นๆ: ${otherText || '-'}`);
         }
 
@@ -1237,10 +1243,10 @@
         google.script.run.withSuccessHandler(res => {
             setLoading('btnSubmitNewCase', false);
             if(res.success) { newCaseModal.hide(); loadData(false); Toast.fire({icon:'success', title:'สำเร็จ'}); }
+            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
         }).createNewCase(form);
     }
 
-    // --- New: Open Edit Modal ---
     function openEditModal(id) {
         const item = rawData.find(x => x.id === id);
         if(!item) return;
@@ -1251,14 +1257,13 @@
         document.getElementById('ec_maidName').value = item.maidName;
         document.getElementById('ec_chatLink').value = item.chatLink;
         
-        // Parse current topic
         let curMain = "", curSubs = [];
         try { const tObj = JSON.parse(item.topic); curMain = tObj.main; curSubs = tObj.sub || []; } catch(e) { curMain = item.topic; }
 
         const mainIdx = configData.topicData.findIndex(t => t.main === curMain);
         if (mainIdx !== -1) {
-            document.getElementById('ec_mainTopic').value = mainIdx;
-            renderSubTopics('ec');
+            // 🌟 อัปเดตค่า Dropdown ในหน้า Edit
+            if(tsInstances['ec_mainTopic']) tsInstances['ec_mainTopic'].setValue(mainIdx);
             
             // Re-select tags
             const tags = document.querySelectorAll('#ec_subTopicContainer .tag-selectable');
@@ -1269,7 +1274,6 @@
                 const txt = t.textContent;
                 if(curSubs.includes(txt)) t.classList.add('active'); 
                 
-                // Check if we have "Others:" stored
                 if (txt === OTHERS_LABEL) {
                     const foundOther = curSubs.find(s => s.startsWith("อื่นๆ:"));
                     if (foundOther) {
@@ -1280,7 +1284,7 @@
                 }
             });
         } else {
-            document.getElementById('ec_mainTopic').value = "";
+            if(tsInstances['ec_mainTopic']) tsInstances['ec_mainTopic'].setValue("");
             document.getElementById('ec_subTopicContainer').innerHTML = "";
         }
         editCaseModal.show();
@@ -1292,7 +1296,6 @@
         const mainText = configData.topicData[parseInt(mainIdx)].main;
         let activeSubs = Array.from(document.querySelectorAll('#ec_subTopicContainer .tag-selectable.active')).map(el => el.textContent);
 
-        // Handle "Others" Text
         if (activeSubs.includes(OTHERS_LABEL)) {
             const otherText = document.getElementById('ec_otherDetail').value.trim();
             activeSubs = activeSubs.filter(s => s !== OTHERS_LABEL);
@@ -1320,37 +1323,28 @@
         }).updateCaseInfo(form);
     }
 
-    // ==========================================
-    // --- UPDATED: MAID AUTOCOMPLETE LOGIC ---
-    // ==========================================
-
     function handleMaidIdInput() {
         const idInput = document.getElementById('nc_maidId');
         const nameInput = document.getElementById('nc_maidName');
         const val = idInput.value.trim().toLowerCase();
         
-        // 1. อัปเดตรายการแนะนำ (Datalist)
         const dl = document.getElementById('maidOptions'); 
         dl.innerHTML = '';
         
         if (val.length > 0) {
-            // ค้นหาทั้งรหัสและชื่อที่ "มีส่วนประกอบ" ของคำค้นหา
             const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val));
             filtered.slice(0, 20).forEach(m => dl.innerHTML += `<option value="${h(m.id)}">${h(m.name)}</option>`);
             
-            // 2. ตรวจสอบว่าพิมพ์ตรงกับ Database พอดีเป๊ะๆ หรือไม่ (Exact Match)
             const exactMatch = maidDatabase.find(m => m.id.toLowerCase() === val || m.name.toLowerCase() === val);
             
             if (exactMatch) {
-                // ถ้าตรงเป๊ะ (User เลือกจาก Datalist หรือพิมพ์จนครบ) -> เติมรหัสและชื่อให้สมบูรณ์
                 idInput.value = exactMatch.id;
                 nameInput.value = exactMatch.name;
             } else {
-                // ถ้ายังพิมพ์ไม่เสร็จ หรือพิมพ์ค้างไว้ (Mismatch) -> ลบชื่อออกก่อน เพื่อป้องกันข้อมูลไม่ตรงกัน
                 nameInput.value = '';
             }
         } else {
-            nameInput.value = ''; // ถ้าช่องรหัสว่าง ก็ลบชื่อด้วย
+            nameInput.value = '';
         }
     }
 
@@ -1376,12 +1370,18 @@
         const id = document.getElementById('nc_maidId').value.trim();
         const name = document.getElementById('nc_maidName').value.trim();
         if(!id || !name) return Toast.fire({ icon: 'warning', title: 'ระบุข้อมูลให้ครบ' });
-        google.script.run.withSuccessHandler(() => { loadMaidData(); Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' }); }).addNewMaid(id, name);
+        google.script.run.withSuccessHandler(res => { 
+            if(res.success) { loadMaidData(); Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' }); }
+            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
+        }).addNewMaid(id, name);
     }
 
     function acceptCase(id, btn) {
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        google.script.run.withSuccessHandler(res => { if(res.success) loadData(false); }).acceptCase(id);
+        google.script.run.withSuccessHandler(res => { 
+            if(res.success) { loadData(false); }
+            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); btn.disabled = false; btn.innerHTML = 'รับเคส'; }
+        }).acceptCase(id);
     }
 
     function openManageModal(id) {
@@ -1396,7 +1396,11 @@
         const id = document.getElementById('mc_id').value;
         const details = document.getElementById('mc_details').value.trim();
         setLoading('btnUpdateDetails', true);
-        google.script.run.withSuccessHandler(() => { setLoading('btnUpdateDetails', false); manageCaseModal.hide(); loadData(false); }).updateActionDetails(id, details);
+        google.script.run.withSuccessHandler(res => { 
+            setLoading('btnUpdateDetails', false); 
+            if(res.success) { manageCaseModal.hide(); loadData(false); }
+            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
+        }).updateActionDetails(id, details);
     }
 
     function submitCloseCase() {
@@ -1404,27 +1408,38 @@
         const details = document.getElementById('mc_details').value.trim();
         if(!details) return Toast.fire({ icon: 'warning', title: 'ระบุรายละเอียด' });
         setLoading('btnCloseCase', true, 'กำลังปิดเคส...');
-        google.script.run.withSuccessHandler(() => { setLoading('btnCloseCase', false); manageCaseModal.hide(); loadData(false); }).closeCase(id, details);
+        google.script.run.withSuccessHandler(res => { 
+            setLoading('btnCloseCase', false); 
+            if(res.success) { manageCaseModal.hide(); loadData(false); }
+            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
+        }).closeCase(id, details);
     }
 
     function openReassign(id, current) {
         document.getElementById('ra_id').value = id;
-        document.getElementById('ra_newAssignee').value = current;
-        document.getElementById('ra_note').value = ''; // Reset note
+        // 🌟 อัปเดตค่าให้ Modal ส่งต่อ 🌟
+        if(tsInstances['ra_newAssignee']) {
+            tsInstances['ra_newAssignee'].setValue(current);
+        }
+        document.getElementById('ra_note').value = ''; 
         reassignModal.show();
     }
 
     function submitReassign() {
         const id = document.getElementById('ra_id').value;
         const target = document.getElementById('ra_newAssignee').value;
-        const note = document.getElementById('ra_note').value.trim(); // New Note
+        const note = document.getElementById('ra_note').value.trim(); 
         
         setLoading('btnSubmitReassign', true, 'กำลังส่งต่อ...');
-        google.script.run.withSuccessHandler(() => { 
+        google.script.run.withSuccessHandler(res => { 
             setLoading('btnSubmitReassign', false); 
-            reassignModal.hide(); 
-            loadData(false); 
-            Toast.fire({ icon: 'success', title: 'ส่งต่องานเรียบร้อย' });
+            if(res.success) {
+                reassignModal.hide(); 
+                loadData(false); 
+                Toast.fire({ icon: 'success', title: 'ส่งต่องานเรียบร้อย' });
+            } else {
+                Swal.fire('เกิดข้อผิดพลาด', res.message, 'error');
+            }
         }).reassignCase(id, target, note);
     }
 
