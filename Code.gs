@@ -1,7 +1,7 @@
 
 // --- Supabase Config ---
-const SUPABASE_URL = 'https://apsnkqgrkjtfsiydjcfd.supabase.co'; 
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwc25rcWdya2p0ZnNpeWRqY2ZkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjMwNjcwMywiZXhwIjoyMDkxODgyNzAzfQ.xlnbmC9rTuvoa8vGmvi1Oufik-zxifQpBrYL9sXAySI';
+const SUPABASE_URL = ''; 
+const SUPABASE_KEY = '';
 
 /**
  * 1. Entry Point: จัดการ Routing เพื่อแสดงหน้า Case, Config หรือ Dashboard
