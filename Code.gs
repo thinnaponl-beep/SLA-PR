@@ -1,15 +1,7 @@
-// ==========================================
-// --- CASE MANAGEMENT LOGIC (By Gustavoz) ---
-// ==========================================
-
-// --- Constants (ชื่อชีทสำหรับเก็บข้อมูล) ---
-const CASE_SHEET_NAME = "Database_Cases"; // ของเดิม (ไม่ใช้ดึงข้อมูลแล้ว แต่ตั้งไว้เผื่อ Setup)
-const CASE_CONFIG_SHEET_NAME = "Config_Cases";
-const MAID_DB_SHEET_NAME = "Database_Maids"; 
 
 // --- Supabase Config ---
-const SUPABASE_URL = ''; 
-const SUPABASE_KEY = '';
+const SUPABASE_URL = 'https://apsnkqgrkjtfsiydjcfd.supabase.co'; 
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwc25rcWdya2p0ZnNpeWRqY2ZkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjMwNjcwMywiZXhwIjoyMDkxODgyNzAzfQ.xlnbmC9rTuvoa8vGmvi1Oufik-zxifQpBrYL9sXAySI';
 
 /**
  * 1. Entry Point: จัดการ Routing เพื่อแสดงหน้า Case, Config หรือ Dashboard
@@ -19,7 +11,6 @@ function doGet(e) {
   let templateName = 'Case'; // Default
 
   if (page === 'config_case') {
-    // Security Check: ป้องกันการเข้าถึงหน้าตั้งค่าผ่าน URL โดยตรง
     if (!checkIsSuperAdmin(Session.getActiveUser().getEmail())) {
        return HtmlService.createHtmlOutput('<h3 style="font-family:sans-serif; text-align:center; margin-top:50px; color:#dc3545;">⛔ Access Denied: คุณไม่มีสิทธิ์เข้าถึงหน้านี้</h3>');
     }
@@ -45,57 +36,34 @@ function getScriptUrl() {
 }
 
 /**
- * Helper: ตรวจสอบสิทธิ์ Super Admin ภายใน Server Script
+ * Helper: ตรวจสอบสิทธิ์ Super Admin ภายใน Server Script (เปลี่ยนมาดึงจาก Supabase)
  */
 function checkIsSuperAdmin(email) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME);
-  if (!sheet) return false;
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return false;
-  
-  // Col 5 (E) = Super Admins
-  const admins = sheet.getRange(2, 5, lastRow - 1, 1).getValues().flat().map(String).filter(e => e !== "");
-  return admins.includes(email);
+  // 🌟 แก้ไขชื่อตารางเป็น Config_System
+  const res = supabaseRequest(`Config_System?config_type=eq.super_admin&value1=eq.${encodeURIComponent(email)}&select=value1`, 'GET');
+  if (res && !res.error && Array.isArray(res) && res.length > 0) {
+    return true;
+  }
+  return false;
 }
 
-/**
- * 3. Setup: กด Run ฟังก์ชันนี้ครั้งแรกเพื่อสร้างหัวคอลัมน์ใน Google Sheets
- */
-function setupCaseSystem() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+// ------------------------------------------
+// --- ฟังก์ชันสำหรับทดสอบการดึงข้อมูล Config ---
+// ------------------------------------------
+function testFetchConfigs() {
+  Logger.log("กำลังทดสอบดึงข้อมูลจากตาราง Config_System...");
+  // 🌟 แก้ไขชื่อตารางเป็น Config_System
+  const res = supabaseRequest('Config_System?select=*&limit=100&order=id.asc', 'GET');
   
-  // สร้าง/ซ่อม Database_Cases (ทิ้งไว้เป็นโครงสร้างเผื่อผู้ใช้เก่า)
-  let caseSheet = ss.getSheetByName(CASE_SHEET_NAME);
-  if (!caseSheet) caseSheet = ss.insertSheet(CASE_SHEET_NAME);
-  if (caseSheet.getRange("A1").getValue() === "") {
-    const caseHeaders = ["Case ID", "Status", "Time_Created", "Time_Accepted", "Time_Closed", "Creator", "Assignee", "Maid ID", "Maid Name", "Topic", "Chat Link", "Action Details", "History Logs"];
-    caseSheet.getRange(1, 1, 1, caseHeaders.length).setValues([caseHeaders]);
-    caseSheet.getRange(1, 1, 1, caseHeaders.length).setFontWeight("bold").setBackground("#31C1D7").setFontColor("#FFFFFF");
-    caseSheet.setFrozenRows(1);
-  }
-
-  // สร้าง/ซ่อม Config_Cases
-  let configSheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME);
-  if (!configSheet) configSheet = ss.insertSheet(CASE_CONFIG_SHEET_NAME);
-  
-  const headerCheck = configSheet.getRange("C1").getValue();
-  if (headerCheck !== "Main Topic") {
-    const configHeaders = ["Assignee Name", "Assignee Email", "Main Topic", "Sub Topics", "Super Admins"];
-    configSheet.getRange(1, 1, 1, 5).setValues([configHeaders]);
-    configSheet.getRange(1, 1, 1, 5).setFontWeight("bold").setBackground("#F59E0B").setFontColor("#FFFFFF");
-    configSheet.setFrozenRows(1);
-  }
-
-  // สร้าง/ซ่อม Database_Maids
-  let maidDbSheet = ss.getSheetByName(MAID_DB_SHEET_NAME);
-  if (!maidDbSheet) maidDbSheet = ss.insertSheet(MAID_DB_SHEET_NAME);
-  if (maidDbSheet.getRange("A1").getValue() === "") {
-    const maidHeaders = ["Maid ID", "Maid Name", "Note"];
-    maidDbSheet.getRange(1, 1, 1, maidHeaders.length).setValues([maidHeaders]);
-    maidDbSheet.getRange(1, 1, 1, maidHeaders.length).setFontWeight("bold").setBackground("#10B981").setFontColor("#FFFFFF");
-    maidDbSheet.setFrozenRows(1);
-    maidDbSheet.appendRow(["5871", "คุณสมศรี ใจดี", "ตัวอย่าง"]);
+  if (!res) {
+    Logger.log("❌ ไม่ได้ข้อมูลกลับมาเลย (ผลลัพธ์เป็น null) กรุณาเช็ค URL หรือ KEY");
+  } else if (res.error) {
+    Logger.log("❌ เกิด Error จาก Supabase: " + JSON.stringify(res.error));
+  } else {
+    Logger.log("✅ ดึงข้อมูลสำเร็จ! พบทั้งหมด " + res.length + " รายการ");
+    if (res.length > 0) {
+      Logger.log("ตัวอย่างข้อมูลรายการแรก: " + JSON.stringify(res[0]));
+    }
   }
 }
 
@@ -104,108 +72,179 @@ function setupCaseSystem() {
 // ------------------------------------------
 
 function supabaseRequest(endpoint, method = 'GET', payload = null) {
+  const cleanUrl = SUPABASE_URL.trim().replace(/\/$/, "");
   const options = {
     method: method,
     headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'apikey': SUPABASE_KEY.trim(),
+      'Authorization': 'Bearer ' + SUPABASE_KEY.trim(),
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     },
     muteHttpExceptions: true
   };
-  if (payload) {
-    options.payload = JSON.stringify(payload);
-  }
+  if (payload) options.payload = JSON.stringify(payload);
   
-  const response = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + endpoint, options);
-  const statusCode = response.getResponseCode();
-  const responseText = response.getContentText();
+  const response = UrlFetchApp.fetch(cleanUrl + '/rest/v1/' + endpoint, options);
+  const code = response.getResponseCode();
+  const text = response.getContentText();
 
-  // 🌟 เพิ่มการ Log เพื่อดักจับปัญหา 🌟
-  console.log(`[Supabase API] ${method} ${endpoint.split('?')[0]} | HTTP Status: ${statusCode}`);
-  
-  if (statusCode !== 200 && statusCode !== 201 && statusCode !== 204) {
-    console.error(`🚨 [Supabase Error] เกิดข้อผิดพลาดจากฐานข้อมูล:`, responseText);
-  } else if (responseText === "[]") {
-    console.warn(`⚠️ [Supabase Warning] ข้อมูลที่ได้กลับมาเป็นก้อนเปล่า [] -> หากคุณมั่นใจว่าใน Table มีข้อมูลอยู่ แปลว่าคุณน่าจะติดระบบ RLS (Row Level Security) ครับ ต้องไปเปิดให้ Read ได้ที่ Supabase`);
-  } else if (responseText.length > 2 && method === 'GET') {
-    // ขอไม่ Log ข้อมูลเต็มๆ เพื่อไม่ให้รกเกินไป
-    // console.log(`✅ [Supabase Success] ดึงข้อมูลสำเร็จ! ตัวอย่างข้อมูล:`, responseText.substring(0, 150) + "...");
+  // 🌟 ดักจับ Error: ถ้ารหัสตั้งแต่ 400 ขึ้นไป (เช่น บันทึกไม่เข้า) ให้เตะ Error กลับไปโชว์ที่หน้าจอ
+  if (code >= 400) {
+    Logger.log(`🚨 Supabase API Error [${code}]: ${text}`);
+    let errMsg = text;
+    try { errMsg = JSON.parse(text).message || text; } catch(e){}
+    throw new Error(`DB Error: ${errMsg}`);
   }
 
-  // ป้องกัน Error จากการพยายาม Parse ค่าว่าง
-  if (!responseText) return null;
-  return JSON.parse(responseText);
+  if (!text || text.trim() === "") return true; // กรณีสำเร็จแต่ไม่มี data ส่งกลับมา
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return text;
+  }
 }
 
+/**
+ * ฟังก์ชันช่วยเหลือ: แปลงวันที่จาก DB ให้เป็นรูปแบบไทย
+ */
+function formatDbDateToTh(dbDateStr) {
+  if (!dbDateStr) return "";
+  const str = dbDateStr.replace('T', ' ').split('+')[0].split('.')[0]; 
+  const parts = str.split(' ');
+  if (parts.length !== 2) return dbDateStr;
+  const ymd = parts[0].split('-');
+  if (ymd.length === 3) {
+    return `${ymd[2]}/${ymd[1]}/${ymd[0]} ${parts[1]}`;
+  }
+  return dbDateStr;
+}
+
+/**
+ * ดึงข้อมูล Case ทั้งหมดแบบ Pagination
+ */
 function fetchCasesAsArray() {
-   console.log("กำลังเริ่มดึงข้อมูลจาก Supabase: Database_Cases...");
-   const res = supabaseRequest('Database_Cases?select=*&limit=10000', 'GET');
-   
-   if (res && res.error) {
-       console.error("❌ ดึงข้อมูลล้มเหลว:", res.error);
-       return [];
+   Logger.log("กำลังดึงข้อมูล Case ทั้งหมดจาก Supabase...");
+   let allCases = [];
+   let offset = 0;
+   const limit = 1000;
+   let hasMore = true;
+
+   while (hasMore) {
+       try {
+           const endpoint = `Database_Cases?select=*&limit=${limit}&offset=${offset}&order=%22Case%20ID%22.desc`;
+           const res = supabaseRequest(endpoint, 'GET');
+           
+           if (res && Array.isArray(res) && res.length > 0) {
+               allCases = allCases.concat(res);
+               if (res.length < limit) hasMore = false; 
+               else offset += limit; 
+           } else {
+               hasMore = false;
+           }
+       } catch (e) {
+           Logger.log("Fetch Cases Error: " + e);
+           hasMore = false;
+       }
    }
 
-   if (res && !res.error && Array.isArray(res)) {
-       console.log(`✅ นำข้อมูลมาแปลงเป็น Array สำเร็จ ได้ทั้งหมด ${res.length} แถว`);
-       // เรียงตาม Case ID จากใหม่ไปเก่า
-       res.sort((a, b) => (b['Case ID'] || "").localeCompare(a['Case ID'] || "")); 
-       return res.map(r => [
-           r['Case ID'] || "", r['Status'] || "", r['Time_Created'] || "", r['Time_Accepted'] || "", r['Time_Closed'] || "",
-           r['Creator'] || "", r['Assignee'] || "", r['Maid ID'] || "", r['Maid Name'] || "",
-           typeof r['Topic'] === 'string' ? r['Topic'] : JSON.stringify(r['Topic'] || {}),
-           r['Chat Link'] || "", r['Action Details'] || "",
-           typeof r['History Logs'] === 'string' ? r['History Logs'] : JSON.stringify(r['History Logs'] || [])
-       ]);
-   }
-   console.warn("⚠️ รูปแบบข้อมูลที่ส่งกลับมาไม่ถูกต้อง หรือไม่ใช่ Array");
-   return [];
+   // 🌟 แปลงวันที่จากฐานข้อมูล (YYYY-MM-DD) เป็นของหน้าจอ (DD/MM/YYYY)
+   return allCases.map(r => [
+       r['Case ID'] || "", r['Status'] || "", 
+       formatDbDateToTh(r['Time_Created']), 
+       formatDbDateToTh(r['Time_Accepted']), 
+       formatDbDateToTh(r['Time_Closed']),
+       r['Creator'] || "", r['Assignee'] || "", r['Maid ID'] || "", r['Maid Name'] || "",
+       typeof r['Topic'] === 'string' ? r['Topic'] : JSON.stringify(r['Topic'] || {}),
+       r['Chat Link'] || "", r['Action Details'] || "",
+       typeof r['History Logs'] === 'string' ? r['History Logs'] : JSON.stringify(r['History Logs'] || [])
+   ]);
+}
+
+/**
+ * ดึงข้อมูลแม่บ้านทั้งหมด (Pagination)
+ */
+function getAllMaids() {
+  Logger.log("กำลังดึงข้อมูลแม่บ้านทั้งหมด...");
+  let allMaids = [];
+  let offset = 0;
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    try {
+      const res = supabaseRequest(`Database_Maids?select=maid_id,maid_name&limit=${limit}&offset=${offset}&order=maid_id.asc`, 'GET');
+      if (res && Array.isArray(res) && res.length > 0) {
+        allMaids = allMaids.concat(res);
+        if (res.length < limit) hasMore = false;
+        else offset += limit;
+      } else {
+        hasMore = false;
+      }
+    } catch (e) {
+      hasMore = false;
+    }
+  }
+
+  return allMaids.map(r => ({ id: String(r.maid_id).trim(), name: String(r.maid_name).trim() })).filter(item => item.id !== "");
 }
 
 function getCaseHistory(caseId) {
-   // 🌟 แปลงคอลัมน์ที่มีเว้นวรรคด้วย %22 (") และ %20 (Space) เพื่อส่ง API
-   const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}&select=%22History%20Logs%22`, 'GET');
-   if (res && res.length > 0) {
-       let logs = res[0]['History Logs'];
-       if (typeof logs === 'string') {
-           try { return JSON.parse(logs); } catch(e) { return []; }
-       }
-       return logs || [];
-   }
+   try {
+     const res = supabaseRequest(`Database_Cases?%22Case%20ID%22=eq.${caseId}&select=%22History%20Logs%22`, 'GET');
+     if (res && Array.isArray(res) && res.length > 0) {
+         let logs = res[0]['History Logs'];
+         if (typeof logs === 'string') {
+             try { return JSON.parse(logs); } catch(e) { return []; }
+         }
+         return logs || [];
+     }
+   } catch(e) { }
    return [];
 }
 
 // ------------------------------------------
-// --- MAID DATABASE FUNCTIONS ---
+// --- MAID DATABASE FUNCTIONS (Supabase) ---
 // ------------------------------------------
 
 function getAllMaids() {
-  console.log("กำลังดึงข้อมูลแม่บ้านจาก Google Sheets...");
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(MAID_DB_SHEET_NAME);
-  if (!sheet) {
-    console.warn("⚠️ ไม่พบชีท MAID_DB_SHEET_NAME");
-    return [];
+  console.log("กำลังดึงข้อมูลแม่บ้านจาก Supabase...");
+  
+  let allMaids = [];
+  let offset = 0;
+  const limit = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const res = supabaseRequest(`Database_Maids?select=maid_id,maid_name&limit=${limit}&offset=${offset}&order=maid_id.asc`, 'GET');
+    
+    if (res && !res.error && Array.isArray(res)) {
+      allMaids = allMaids.concat(res);
+      if (res.length < limit) {
+        hasMore = false;
+      } else {
+        offset += limit;
+      }
+    } else {
+      hasMore = false;
+    }
   }
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
-  const data = sheet.getRange(2, 1, lastRow - 1, 2).getDisplayValues();
-  console.log(`✅ ดึงข้อมูลแม่บ้านสำเร็จ ได้ ${data.length} คน`);
-  return data.map(r => ({ id: String(r[0]).trim(), name: String(r[1]).trim() })).filter(item => item.id !== "");
+
+  if (allMaids.length > 0) {
+    console.log(`✅ ดึงข้อมูลแม่บ้านสำเร็จ รวมได้ทั้งหมด ${allMaids.length} คน`);
+    return allMaids.map(r => ({ id: String(r.maid_id).trim(), name: String(r.maid_name).trim() })).filter(item => item.id !== "");
+  }
+  
+  return [];
 }
 
 function searchMaidById(maidId) {
   if (!maidId) return { success: false, message: "กรุณาระบุรหัส" };
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(MAID_DB_SHEET_NAME);
-  if (!sheet) return { success: false, message: "ไม่พบชีทฐานข้อมูลแม่บ้าน" };
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return { success: false, found: false };
-  const data = sheet.getRange(2, 1, lastRow - 1, 2).getDisplayValues();
-  const maid = data.find(row => row[0].trim() === String(maidId).trim());
-  if (maid) return { success: true, found: true, name: maid[1] };
+  const res = supabaseRequest(`Database_Maids?maid_id=eq.${encodeURIComponent(maidId)}&select=*`, 'GET');
+  if (res && !res.error && Array.isArray(res) && res.length > 0) {
+    return { success: true, found: true, name: res[0].maid_name };
+  }
   return { success: true, found: false };
 }
 
@@ -213,47 +252,61 @@ function addNewMaid(maidId, maidName) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(5000);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(MAID_DB_SHEET_NAME);
-    if (!sheet) return { success: false, message: "Database_Maids not found" };
-    const lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat().map(String);
-      if (ids.includes(String(maidId))) return { success: false, message: "รหัสแม่บ้านนี้มีอยู่ในระบบแล้ว" };
+    const check = supabaseRequest(`Database_Maids?maid_id=eq.${encodeURIComponent(maidId)}&select=maid_id`, 'GET');
+    if (check && !check.error && Array.isArray(check) && check.length > 0) {
+      return { success: false, message: "รหัสแม่บ้านนี้มีอยู่ในระบบแล้ว" };
     }
-    sheet.appendRow([maidId, maidName, "Added via Case Form"]);
+    
+    const payload = {
+      "maid_id": maidId,
+      "maid_name": maidName,
+      "note": "Added via Case Form"
+    };
+    
+    const res = supabaseRequest('Database_Maids', 'POST', payload);
+    if (res && res.error) throw new Error(res.error.message);
+    
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; } finally { lock.releaseLock(); }
+  } catch (e) { 
+    return { success: false, message: e.toString() }; 
+  } finally { 
+    lock.releaseLock(); 
+  }
 }
 
 // ------------------------------------------
-// --- CONFIG DATA FUNCTIONS ---
+// --- CONFIG DATA FUNCTIONS (Supabase) ---
 // ------------------------------------------
 
 function getCaseConfigs() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME);
-  if (!sheet) { setupCaseSystem(); sheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME); }
+  // 🌟 แก้ไขชื่อตารางเป็น Config_System
+  const res = supabaseRequest('Config_System?select=*&limit=1000&order=id.asc', 'GET');
   
-  const lastRow = sheet.getLastRow();
   let admins = []; 
   let topicData = []; 
   let adminDetails = [];
   let superAdmins = [];
 
-  if (lastRow > 1) {
-    const data = sheet.getRange(2, 1, lastRow - 1, 5).getDisplayValues();
-    admins = data.map(r => String(r[1]).trim()).filter(v => v !== ""); 
-    adminDetails = data.map(r => ({ name: String(r[0]).trim(), email: String(r[1]).trim() })).filter(obj => obj.email !== "");
-    
-    const rawTopics = data.map(r => ({ main: String(r[2]).trim(), subs: String(r[3]).trim() })).filter(t => t.main !== "");
-    topicData = rawTopics.map(t => {
-        return {
-            main: t.main,
-            subs: t.subs ? t.subs.split(',').map(s => s.trim()).filter(s => s !== "") : []
-        };
-    });
-    superAdmins = data.map(r => String(r[4]).trim()).filter(v => v !== "");
+  if (res && !res.error && Array.isArray(res)) {
+      res.forEach(row => {
+          if (row.config_type === 'admin') {
+              if (row.value1) {
+                  admins.push(row.value2 || row.value1); 
+                  adminDetails.push({ name: row.value1, email: row.value2 || "" });
+              }
+          } else if (row.config_type === 'topic') {
+              if (row.value1) {
+                  topicData.push({
+                      main: row.value1,
+                      subs: row.value2 ? row.value2.split(',').map(s => s.trim()).filter(s => s !== "") : []
+                  });
+              }
+          } else if (row.config_type === 'super_admin') {
+              if (row.value1) {
+                  superAdmins.push(row.value1);
+              }
+          }
+      });
   }
   
   return { 
@@ -268,90 +321,65 @@ function addCaseConfigItem(type, value, subValue) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(5000);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME);
-    if (!sheet) return { success: false, message: "Config sheet not found" };
-    const lastRow = Math.max(sheet.getLastRow(), 1);
-    
+    let payload = { config_type: type };
     if (type === 'admin') {
       let parts = value.split('|');
-      let name = parts[0].trim();
-      let email = parts.length > 1 ? parts[1].trim() : "";
-      let colA = sheet.getRange(2, 1, lastRow, 1).getValues().flat();
-      let idx = colA.findIndex(r => r === "");
-      let targetRow = (idx === -1) ? sheet.getLastRow() + 1 : idx + 2;
-      sheet.getRange(targetRow, 1).setValue(name);
-      sheet.getRange(targetRow, 2).setValue(email);
-    } 
-    else if (type === 'topic') {
-      let colC = sheet.getRange(2, 3, lastRow, 1).getValues().flat();
-      let idx = colC.findIndex(r => r === "");
-      let targetRow = (idx === -1) ? sheet.getLastRow() + 1 : idx + 2;
-      sheet.getRange(targetRow, 3).setValue(value);
-      sheet.getRange(targetRow, 4).setValue(subValue || "");
+      payload.value1 = parts[0].trim();
+      payload.value2 = parts.length > 1 ? parts[1].trim() : "";
+    } else if (type === 'topic') {
+      payload.value1 = value;
+      payload.value2 = subValue || "";
+    } else if (type === 'super_admin') {
+      payload.value1 = value;
+      payload.value2 = "";
     }
-    else if (type === 'super_admin') {
-      let colE = sheet.getRange(2, 5, lastRow, 1).getValues().flat();
-      let idx = colE.findIndex(r => r === "");
-      let targetRow = (idx === -1) ? sheet.getLastRow() + 1 : idx + 2;
-      sheet.getRange(targetRow, 5).setValue(value);
-    }
+    
+    // 🌟 แก้ไขชื่อตารางเป็น Config_System
+    const res = supabaseRequest('Config_System', 'POST', payload);
+    if (res && res.error) throw new Error(res.error.message);
+    
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; } finally { lock.releaseLock(); }
+  } catch (e) { 
+    return { success: false, message: e.toString() }; 
+  } finally { 
+    lock.releaseLock(); 
+  }
 }
 
 function updateCaseConfigTopic(oldName, newName, newSubs) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(5000);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME);
-    if (!sheet) return { success: false, message: "Config sheet not found" };
-    
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return { success: false, message: "No data to update" };
-    
-    const topics = sheet.getRange(2, 3, lastRow - 1, 1).getValues().flat();
-    const index = topics.indexOf(oldName);
-    
-    if (index === -1) return { success: false, message: "Topic not found" };
-    
-    const row = index + 2;
-    sheet.getRange(row, 3).setValue(newName);
-    sheet.getRange(row, 4).setValue(newSubs || "");
+    const payload = {
+        "value1": newName,
+        "value2": newSubs || ""
+    };
+    // 🌟 แก้ไขชื่อตารางเป็น Config_System
+    const res = supabaseRequest(`Config_System?config_type=eq.topic&value1=eq.${encodeURIComponent(oldName)}`, 'PATCH', payload);
+    if (res && res.error) throw new Error(res.error.message);
     
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; } finally { lock.releaseLock(); }
+  } catch (e) { 
+    return { success: false, message: e.toString() }; 
+  } finally { 
+    lock.releaseLock(); 
+  }
 }
 
 function removeCaseConfigItem(type, value) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(5000);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME);
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return { success: false, message: "No data" };
-    
-    if (type === 'admin') {
-      let range = sheet.getRange(2, 1, lastRow - 1, 1);
-      let values = range.getValues().flat();
-      let index = values.indexOf(value);
-      if (index !== -1) sheet.getRange(index + 2, 1, 1, 2).clearContent();
-    } else if (type === 'topic') {
-      let range = sheet.getRange(2, 3, lastRow - 1, 1); 
-      let values = range.getValues().flat();
-      let index = values.indexOf(value);
-      if (index !== -1) sheet.getRange(index + 2, 3, 1, 2).clearContent();
-    } else if (type === 'super_admin') {
-      let range = sheet.getRange(2, 5, lastRow - 1, 1);
-      let values = range.getValues().flat();
-      let index = values.indexOf(value);
-      if (index !== -1) sheet.getRange(index + 2, 5).clearContent();
-    }
+    // 🌟 แก้ไขชื่อตารางเป็น Config_System
+    const res = supabaseRequest(`Config_System?config_type=eq.${type}&value1=eq.${encodeURIComponent(value)}`, 'DELETE');
+    if (res && res.error) throw new Error(res.error.message);
     
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; } finally { lock.releaseLock(); }
+  } catch (e) { 
+    return { success: false, message: e.toString() }; 
+  } finally { 
+    lock.releaseLock(); 
+  }
 }
 
 // ------------------------------------------
@@ -365,7 +393,6 @@ function getCasesData() {
   let data = [];
   let stats = { total: 0, pending: 0, progress: 0, closed: 0 };
 
-  // 🌟 ดึงข้อมูลจาก Supabase 🌟
   const values = fetchCasesAsArray();
 
   if (values.length > 0) {
@@ -411,15 +438,14 @@ function getCasesData() {
 
 function createNewCase(form) {
   try {
-    console.log("กำลังสร้างเคสใหม่...");
     const user = Session.getActiveUser().getEmail();
     
     let createdTimeStr;
     if (form.caseDate && form.caseTime) {
-      const [year, month, day] = form.caseDate.split('-');
-      createdTimeStr = `${day}/${month}/${year} ${form.caseTime}:00`;
+      const [formYear, formMonth, formDay] = form.caseDate.split('-');
+      createdTimeStr = `${formYear}-${formMonth}-${formDay} ${form.caseTime}:00`;
     } else {
-      createdTimeStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
+      createdTimeStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
     }
     
     const year = new Date().getFullYear().toString().substr(-2);
@@ -433,7 +459,7 @@ function createNewCase(form) {
     const caseId = `${prefix}${String(maxSeq + 1).padStart(4, '0')}`;
 
     const newLog = {
-      timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss"),
+      timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"),
       action: "Create",
       user: user,
       details: "เปิดเคสใหม่"
@@ -449,7 +475,6 @@ function createNewCase(form) {
         "Assignee": form.assignee,
         "Maid ID": form.maidId,
         "Maid Name": form.maidName,
-        // 🌟 ต้อง JSON.stringify แปลง Object/Array เป็น Text ก่อนยิงไป Supabase
         "Topic": JSON.stringify(form.topicObj || {}), 
         "Chat Link": form.chatLink,
         "Action Details": "",
@@ -457,14 +482,12 @@ function createNewCase(form) {
     };
 
     const res = supabaseRequest('Database_Cases', 'POST', payload);
-    if (res && res.error) throw new Error(res.error.message);
+    if (!res || res.error) {
+  throw new Error("Insert failed: " + JSON.stringify(res));
+}
     
-    console.log(`✅ สร้างเคส ${caseId} สำเร็จ`);
     return { success: true };
-  } catch (e) { 
-    console.error("🚨 Error (createNewCase):", e.toString());
-    return { success: false, message: e.toString() }; 
-  }
+  } catch (e) { return { success: false, message: e.toString() }; }
 }
 
 function acceptCase(caseId) {
@@ -479,7 +502,6 @@ function acceptCase(caseId) {
     const payload = {
         "Status": "กำลังประสานงาน",
         "Time_Accepted": now,
-        // 🌟 ต้อง JSON.stringify แปลง Array เป็น Text ก่อน
         "History Logs": JSON.stringify(history)
     };
 
@@ -517,7 +539,6 @@ function updateCaseInfo(form) {
     const payload = {
         "Maid ID": form.maidId,
         "Maid Name": form.maidName,
-        // 🌟 ต้อง JSON.stringify แปลง Object/Array เป็น Text ก่อน
         "Topic": JSON.stringify(form.topicObj || {}),
         "Chat Link": form.chatLink,
         "History Logs": JSON.stringify(history)
@@ -546,7 +567,6 @@ function closeCase(caseId, details) {
         "Status": "ปิดเคส",
         "Time_Closed": now,
         "Action Details": details,
-        // 🌟 ต้อง JSON.stringify แปลง Array เป็น Text ก่อน
         "History Logs": JSON.stringify(history)
     };
 
@@ -581,7 +601,6 @@ function reassignCase(caseId, newAssignee, note) {
 
     const payload = {
         "Assignee": newAssignee,
-        // 🌟 ต้อง JSON.stringify แปลง Array เป็น Text ก่อน
         "History Logs": JSON.stringify(history)
     };
 
@@ -667,8 +686,6 @@ function getTopicCases(dateStr, topicName) {
 }
 
 function getDashboardStats(viewMode, filterValue, filterAssignee) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
   const emptyResult = { 
     avgOpenAccept: '-', 
     avgAcceptClose: '-', 
@@ -679,7 +696,6 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
     topicStats: []
   };
 
-  // 🌟 ดึงข้อมูลจาก Supabase 🌟
   const data = fetchCasesAsArray();
   if (data.length === 0) return emptyResult;
   
@@ -728,11 +744,10 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
     return result.join(' ');
   };
 
-  const configSheet = ss.getSheetByName(CASE_CONFIG_SHEET_NAME);
+  const configs = getCaseConfigs();
   let adminNames = {};
-  if (configSheet && configSheet.getLastRow() > 1) {
-     const configData = configSheet.getRange(2, 1, configSheet.getLastRow()-1, 2).getDisplayValues();
-     configData.forEach(r => { if(r[1]) adminNames[r[1].trim()] = r[0]; });
+  if (configs.adminDetails && configs.adminDetails.length > 0) {
+      configs.adminDetails.forEach(a => { if(a.email) adminNames[a.email] = a.name; });
   }
 
   let refValue = ""; 
@@ -1044,7 +1059,7 @@ function analyzeCombinedStatsWithAI(promptData) {
    - เสนอแนวทาง 2-3 ข้อ เพื่อช่วยลดเวลาทำงาน กระจายงาน หรือปรับปรุงวิธีการเขียนบันทึกของทีมให้เป็นระบบมากขึ้น
 
 ข้อกำหนดรูปแบบการตอบ (STRICT FORMATTING): 
-- **ห้าม** พิมพ์คำเกริ่นนำหรือคำลงท้าย (เช่น ห้ามพิมพ์ "เรียน...", "ขอแสดงความนับถือ")
+- **ห้าม** พิมพ์คำเกริ่นนำหรือคำทักทาย (เช่น ห้ามพิมพ์ "เรียน...", "ขอแสดงความนับถือ")
 - บังคับประโยคแรกเริ่มที่ "1. 📊 สรุปประสิทธิภาพการทำงานของทีม" ทันที
 - ใช้ภาษาแบบกึ่งทางการ สบายๆ อ่านง่าย แต่อ้างอิงตัวเลข/ข้อมูลจริงเสนอเสมอ
 - **บังคับ:** เวลายกตัวอย่างเคส ให้ระบุรหัสเคส เช่น [CASE-26-0195] เสมอ (ห้ามใช้คำว่า Case 1, 2)`;
