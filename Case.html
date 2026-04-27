@@ -14,10 +14,6 @@
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
-  <!-- 🌟 NEW: Tom Select (สำหรับทำ Dropdown แบบพิมพ์ค้นหาได้) -->
-  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-  
   <style>
     :root { 
         --ci-primary: #31C1D7; 
@@ -236,18 +232,11 @@
         display: inline-block; 
     }
     
-    .dot-purple { background-color: #a855f7; }
+    /* Timeline 4 Points Colors */
+    .dot-purple { background-color: #a855f7; } 
     .dot-blue { background-color: #3b82f6; }   
     .dot-yellow { background-color: #f59e0b; } 
     .dot-green { background-color: #22c55e; }  
-
-    /* Custom Style for Tom Select to match Bootstrap shadow-sm */
-    .ts-control {
-        border: 1px solid #dee2e6;
-        box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
-        border-radius: 0.375rem;
-        padding: 0.4rem 0.75rem;
-    }
   </style>
 </head>
 <body class="p-4">
@@ -290,7 +279,6 @@
                 <i class="fas fa-chart-pie me-1"></i> Dashboard
             </button>
 
-            <!-- Config Button -->
             <button class="btn btn-outline-secondary fw-bold rounded-pill shadow-sm px-3 d-none" id="btnConfig" onclick="window.top.location.href = '<?= url ?>?page=config_case'">
                 <i class="fas fa-cog me-1"></i>ตั้งค่า
             </button>
@@ -339,12 +327,15 @@
                 </button>
             </div>
 
-            <!-- Assignee Filter (จะถูกแปลงเป็น Tom Select) -->
-            <select class="form-select shadow-sm fw-bold text-secondary" id="filterAssignee" style="max-width: 250px; min-width: 200px;">
+            <select class="form-select shadow-sm fw-bold text-secondary" id="filterAssignee" onchange="renderTable()" style="max-width: 180px;">
                 <option value="all">👤 เจ้าหน้าที่ทุกคน</option>
             </select>
 
-            <input type="date" class="form-control shadow-sm fw-bold text-secondary" id="filterDate" onchange="renderTable()" style="max-width: 150px;">
+            <input type="date" class="form-control shadow-sm fw-bold text-secondary" id="filterDate" onchange="loadData(true)" style="max-width: 150px;">
+            
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-sm" onclick="loadAllData()">
+                <i class="fas fa-database me-1"></i> โหลดข้อมูลทั้งหมด
+            </button>
             
             <button class="btn btn-outline-primary fw-bold rounded-pill px-3 shadow-sm" onclick="filterMyCases()">
                 <i class="fas fa-user-check me-1"></i> งานของฉัน
@@ -368,7 +359,7 @@
             <thead>
                 <tr>
                     <th class="text-center">สถานะ / ID</th>
-                    <th>SLA Timeline (4 Points)</th>
+                    <th>SLA Timeline (4 Points) <i class="fas fa-info-circle text-muted small ms-1" data-bs-toggle="tooltip" title="ม่วง:  เวลาที่Assign (User) | ฟ้า: เวลาที่เปิดเคส (System) | เหลือง: รับเคส | เขียว: ปิดงาน"></i></th>
                     <th>ระยะเวลา</th>
                     <th>ผู้รับผิดชอบ</th>
                     <th>ข้อมูลแม่บ้าน</th>
@@ -425,18 +416,21 @@
                         </button>
                     </div>
                 </div>
-                
                 <div class="col-12">
                     <label class="form-label small fw-bold text-muted">ผู้รับผิดชอบเคส <span class="text-danger">*</span></label>
-                    <select id="nc_assignee" placeholder="พิมพ์ชื่อเพื่อค้นหา..."></select>
+                    <select class="form-select shadow-sm" id="nc_assignee">
+                        <option value="" selected disabled>กำลังโหลดรายชื่อ...</option>
+                    </select>
                 </div>
                 
                 <div class="col-12">
-                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อหลัก <span class="text-danger">*</span></label>
-                    <select id="nc_mainTopic" placeholder="พิมพ์หัวข้อเพื่อค้นหา..."></select>
+                    <label class="form-label small fw-bold text-muted">หัวข้อหลัก <span class="text-danger">*</span></label>
+                    <select class="form-select shadow-sm mb-2" id="nc_mainTopic" onchange="renderSubTopics('nc')">
+                        <option value="" selected disabled>-- เลือกหัวข้อหลัก --</option>
+                    </select>
                     
-                    <label class="form-label small fw-bold text-muted mt-3">หัวข้อย่อย (เลือกได้หลายข้อ)</label>
-                    <div id="nc_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light shadow-sm" style="min-height: 50px;">
+                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อย่อย (เลือกได้หลายข้อ)</label>
+                    <div id="nc_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light" style="min-height: 50px;">
                         <span class="text-muted small align-self-center ps-2">กรุณาเลือกหัวข้อหลักก่อน</span>
                     </div>
                     
@@ -445,7 +439,7 @@
                     </div>
                 </div>
 
-                <div class="col-12 mt-3">
+                <div class="col-12">
                     <label class="form-label small fw-bold text-muted">Link Chat (beneat-chat)</label>
                     <input type="url" class="form-control shadow-sm" id="nc_chatLink" placeholder="วางลิงก์ห้องแชท...">
                 </div>
@@ -485,18 +479,18 @@
                 </div>
                 
                 <div class="col-12">
-                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อหลัก</label>
-                    <select id="ec_mainTopic" placeholder="พิมพ์หัวข้อเพื่อค้นหา..."></select>
+                    <label class="form-label small fw-bold text-muted">หัวข้อหลัก</label>
+                    <select class="form-select shadow-sm mb-2" id="ec_mainTopic" onchange="renderSubTopics('ec')"></select>
                     
-                    <label class="form-label small fw-bold text-muted mt-3">หัวข้อย่อย</label>
-                    <div id="ec_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light shadow-sm" style="min-height: 50px;"></div>
+                    <label class="form-label small fw-bold text-muted mt-2">หัวข้อย่อย</label>
+                    <div id="ec_subTopicContainer" class="d-flex flex-wrap gap-2 p-2 border rounded bg-light" style="min-height: 50px;"></div>
                     
                     <div id="ec_otherInputDiv" class="mt-2 d-none">
                         <input type="text" id="ec_otherDetail" class="form-control shadow-sm" placeholder="โปรดระบุรายละเอียดเพิ่มเติม...">
                     </div>
                 </div>
 
-                <div class="col-12 mt-3">
+                <div class="col-12">
                     <label class="form-label small fw-bold text-muted">Link Chat</label>
                     <input type="url" class="form-control shadow-sm" id="ec_chatLink">
                 </div>
@@ -563,10 +557,10 @@
             <input type="hidden" id="ra_id">
             <div class="mb-3">
                 <label class="form-label small fw-bold">มอบหมายงานให้กับ:</label>
-                <select id="ra_newAssignee" placeholder="พิมพ์ชื่อเพื่อค้นหา..."></select>
+                <select class="form-select shadow-sm" id="ra_newAssignee"></select>
             </div>
             <div class="mb-3">
-                <label class="form-label small fw-bold mt-2">หมายเหตุ / ฝากข้อความ (Note):</label>
+                <label class="form-label small fw-bold">หมายเหตุ / ฝากข้อความ (Note):</label>
                 <textarea class="form-control shadow-sm" id="ra_note" rows="3" placeholder="ระบุเหตุผล หรือสิ่งที่ต้องทำต่อ..."></textarea>
             </div>
         </div>
@@ -581,31 +575,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // --- Global Variables ---
-    if (typeof google === 'undefined') {
-      console.warn("Running outside Google Apps Script environment. Mocking google.script.run.");
-      window.google = {
-        script: {
-          get run() {
-            let successCb, failureCb;
-            const chain = {
-              withSuccessHandler: function(cb) { successCb = cb; return chain; },
-              withFailureHandler: function(cb) { failureCb = cb; return chain; },
-              getCasesData: function() { setTimeout(() => successCb && successCb({ data: [], currentUser: 'test@local', canConfig: true, configs: { admins: [], topicData: [], adminDetails: [] } }), 500); },
-              getAllMaids: function() { setTimeout(() => successCb && successCb([]), 500); },
-              createNewCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
-              updateCaseInfo: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
-              addNewMaid: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
-              acceptCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
-              updateActionDetails: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
-              closeCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); },
-              reassignCase: function() { setTimeout(() => successCb && successCb({success: true}), 500); }
-            };
-            return chain;
-          }
-        }
-      };
-    }
-
     let rawData = [];
     let configData = { admins: [], topicData: [], adminDetails: [] }; 
     let currentStatusFilter = 'all'; 
@@ -613,7 +582,6 @@
     let currentUserEmail = "";
     let maidDatabase = []; 
     let readCases = []; 
-    let tsInstances = {}; // 🌟 เก็บตัวแปรสำหรับ Searchable Dropdown (Tom Select)
     const OTHERS_LABEL = "อื่นๆ (โปรดระบุ)";
 
     const Toast = Swal.mixin({
@@ -622,12 +590,24 @@
 
     function h(str) {
         if (str === null || str === undefined) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+            .replace(/`/g, '&#96;')
+            .replace(/\$/g, '&#36;');
     }
     
     function escapeJs(str) {
         if (!str) return '';
-        return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '');
+        return String(str)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '');
     }
 
     function parseDateTime(s) {
@@ -635,26 +615,21 @@
         let str = String(s).trim();
         if (str === "" || str === "-" || str.toLowerCase() === "null") return 0;
         
-        let d = new Date(str);
-        if (!isNaN(d.getTime())) {
-            if (d.getFullYear() > 2400) d.setFullYear(d.getFullYear() - 543);
-            return d.getTime();
-        }
-
         try {
-            str = str.replace('T', ' ');
+            str = str.replace('T', ' '); 
             const parts = str.split(' ');
             
             let timeParts = ['00', '00', '00'];
-            if (parts.length > 1) {
+            if (parts.length > 1 && parts[1].includes(':')) {
                 timeParts = parts[1].split(':');
             }
             
-            let y, m, day;
+            let y, m, d;
+            
             if (parts[0].includes('/')) { 
                 const dParts = parts[0].split('/');
                 if(dParts.length !== 3) return 0;
-                day = parseInt(dParts[0], 10);
+                d = parseInt(dParts[0], 10);
                 m = parseInt(dParts[1], 10) - 1; 
                 y = parseInt(dParts[2], 10);
             } else if (parts[0].includes('-')) { 
@@ -662,9 +637,9 @@
                 if(dParts.length !== 3) return 0;
                 y = parseInt(dParts[0], 10);
                 m = parseInt(dParts[1], 10) - 1;
-                day = parseInt(dParts[2], 10);
+                d = parseInt(dParts[2], 10);
             } else {
-                return 0;
+                return 0; 
             }
             
             if (y > 2400) y -= 543;
@@ -673,10 +648,20 @@
             const min = parseInt(timeParts[1], 10) || 0;
             const sec = parseInt(timeParts[2], 10) || 0;
             
-            return new Date(y, m, day, h, min, sec).getTime();
+            return new Date(y, m, d, h, min, sec).getTime();
         } catch(e) { return 0; }
     }
 
+    function checkIsToday(sysTimeStr) {
+        const ts = parseDateTime(sysTimeStr);
+        if (ts === 0) return false;
+        const d = new Date(ts);
+        const now = new Date();
+        return d.getDate() === now.getDate() &&
+               d.getMonth() === now.getMonth() &&
+               d.getFullYear() === now.getFullYear();
+    }
+    
     function checkDateMatch(sysTimeStr, filterDateVal) {
         if (!filterDateVal) return true; 
         const ts = parseDateTime(sysTimeStr);
@@ -707,8 +692,8 @@
         const hh = String(d.getHours()).padStart(2, '0');
         const min = String(d.getMinutes()).padStart(2, '0');
         
-        const displayStr = `${dd}/${mm}/${yyyy} ${hh}:${min}`;
-        return `<span class="badge bg-light text-secondary border fw-normal shadow-sm" style="font-size:0.7em; padding: 3px 6px;">${displayStr}</span>`;
+        const displayStr = dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
+        return '<span class="badge bg-light text-secondary border fw-normal shadow-sm" style="font-size:0.7em; padding: 3px 6px;">' + displayStr + '</span>';
     }
 
     function getHoursDiff(dateTimeStr) {
@@ -716,6 +701,10 @@
         const target = parseDateTime(dateTimeStr);
         if (target === 0) return 0;
         return (new Date().getTime() - target) / (1000 * 60 * 60);
+    }
+    
+    function isOver12Hours(dateTimeStr) {
+        return getHoursDiff(dateTimeStr) > 12;
     }
 
     function calculateDuration(startStr, endStr) {
@@ -734,9 +723,9 @@
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
         let res = [];
-        if (days > 0) res.push(`${days} วัน`);
-        if (hours > 0) res.push(`${hours} ชม.`);
-        res.push(`${minutes} น.`);
+        if (days > 0) res.push(days + ' วัน');
+        if (hours > 0) res.push(hours + ' ชม.');
+        res.push(minutes + ' น.');
         
         return res.length > 0 ? res.join(' ') : '0 น.';
     }
@@ -757,7 +746,7 @@
         if (isLoading) {
             btn.disabled = true;
             btn.dataset.original = btn.innerHTML;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${text || 'กำลังบันทึก...'}`;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + (text || 'กำลังบันทึก...');
         } else {
             btn.disabled = false;
             if (btn.dataset.original) btn.innerHTML = btn.dataset.original;
@@ -785,15 +774,18 @@
 
     function filterMyCases() {
         if (currentUserEmail) {
-            if (tsInstances['filterAssignee']) {
-                tsInstances['filterAssignee'].setValue(currentUserEmail);
-            } else {
-                document.getElementById('filterAssignee').value = currentUserEmail;
-            }
+            document.getElementById('filterAssignee').value = currentUserEmail;
             renderTable();
             Toast.fire({ icon: 'success', title: 'แสดงงานของคุณแล้ว' });
         }
     }
+
+    function loadAllData() {
+        document.getElementById('filterDate').value = '';
+        loadData(true, 'ALL');
+    }
+
+    // --- Main Logic ---
 
     window.onload = function() {
         newCaseModal = new bootstrap.Modal(document.getElementById('newCaseModal'));
@@ -805,13 +797,22 @@
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map(t => new bootstrap.Tooltip(t));
 
-        loadData(true);
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('filterDate').value = today;
+        loadData(true, today);
+        
         loadMaidData();
     };
 
-    function loadData(full) {
+    function loadData(full, targetDate) {
         if(full) Swal.fire({ title: 'กำลังโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-        google.script.run.withSuccessHandler(res => {
+        
+        if (targetDate === undefined) {
+            targetDate = document.getElementById('filterDate').value;
+        }
+
+        google.script.run
+        .withSuccessHandler(res => {
             if(full) Swal.close();
             
             rawData = (res.data || []).map(item => {
@@ -823,7 +824,7 @@
                 } catch(e){}
                 item.systemCreatedTime = sysTime; 
                 return item;
-            }).sort((a, b) => b.id.localeCompare(a.id));
+            }).sort((a, b) => (b.id || "").localeCompare(a.id || ""));
             
             currentUserEmail = res.currentUser;
             document.getElementById('currentUserDisplay').textContent = currentUserEmail;
@@ -837,35 +838,39 @@
             
             updateNotifications();
             renderTable();
-        }).getCasesData();
+        })
+        .withFailureHandler(err => {
+            if(full) Swal.close();
+            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลจากระบบหลังบ้านได้: ' + err.message, 'error');
+        })
+        .getCasesData(targetDate);
     }
 
     function getTopicHtml(topicRaw) {
         try {
             const tObj = JSON.parse(topicRaw);
             if (tObj && tObj.main) {
-                let html = `<div class="topic-main-badge">${h(tObj.main)}</div>`;
+                let html = '<div class="topic-main-badge">' + h(tObj.main) + '</div>';
                 if (tObj.sub && Array.isArray(tObj.sub) && tObj.sub.length > 0) {
-                    html += `<div>`;
+                    html += '<div>';
                     tObj.sub.forEach(s => {
-                        html += `<span class="topic-sub-tag">${h(s)}</span>`;
+                        html += '<span class="topic-sub-tag">' + h(s) + '</span>';
                     });
-                    html += `</div>`;
+                    html += '</div>';
                 }
                 return html;
             }
-        } catch (e) {
-            return `<span class="badge bg-light text-dark border-0 shadow-sm">${h(topicRaw)}</span>`;
-        }
-        return '-';
+        } catch (e) {}
+        return '<span class="badge bg-light text-dark border-0 shadow-sm">' + h(topicRaw) + '</span>';
     }
 
     function getTopicText(topicRaw) {
+        if (!topicRaw) return "";
         try {
             const tObj = JSON.parse(topicRaw);
             if (tObj && tObj.main) return tObj.main + " " + (tObj.sub ? tObj.sub.join(" ") : "");
-        } catch(e) { return topicRaw; }
-        return "";
+        } catch(e) {}
+        return String(topicRaw);
     }
 
     function renderTable() {
@@ -879,15 +884,19 @@
         const isIdSearch = searchText.startsWith('case-');
 
         const filtered = rawData.filter(item => {
-            const searchPool = `${item.id} ${item.maidName} ${item.maidId} ${getDisplayName(item.assignee)} ${getTopicText(item.topic)}`.toLowerCase();
+            const safeId = item.id || "";
+            const safeMaidName = item.maidName || "";
+            const safeMaidId = item.maidId || "";
+            const safeAssigneeName = getDisplayName(item.assignee) || "";
+            const safeTopic = getTopicText(item.topic) || "";
+            
+            const searchPool = (safeId + " " + safeMaidName + " " + safeMaidId + " " + safeAssigneeName + " " + safeTopic).toLowerCase();
             const matchesSearch = searchPool.includes(searchText);
             
-            if (isIdSearch) {
-                return matchesSearch;
-            }
+            if (isIdSearch) return matchesSearch;
             
             const matchesStatus = (currentStatusFilter === 'all' || item.status === currentStatusFilter);
-            const matchesAssignee = (fAssignee === 'all' || item.assignee.trim() === fAssignee.trim());
+            const matchesAssignee = (fAssignee === 'all' || (item.assignee && item.assignee.trim() === fAssignee.trim()));
             const matchesDate = checkDateMatch(item.systemCreatedTime, fDate);
             
             return matchesSearch && matchesStatus && matchesAssignee && matchesDate;
@@ -906,47 +915,63 @@
             
             let actions = '';
             if (item.status === 'รอการประสานงาน') {
-                actions = `<button class="btn btn-sm btn-action btn-outline-warning w-100 mb-1" onclick="acceptCase('${clickId}', this)">รับเคส</button>`;
+                actions = '<button class="btn btn-sm btn-action btn-outline-warning w-100 mb-1" onclick="acceptCase(\'' + clickId + '\', this)">รับเคส</button>';
             } else if (item.status === 'กำลังประสานงาน') {
-                actions = `<button class="btn btn-sm btn-action btn-primary w-100 mb-1" onclick="openManageModal('${clickId}')">จัดการ</button>`;
+                actions = '<button class="btn btn-sm btn-action btn-primary w-100 mb-1" onclick="openManageModal(\'' + clickId + '\')">จัดการ</button>';
             } else {
-                actions = `<div class="text-success fw-bold small text-center"><i class="fas fa-check-circle"></i> DONE</div>`;
+                actions = '<div class="text-success fw-bold small text-center"><i class="fas fa-check-circle"></i> DONE</div>';
             }
-            if (item.status !== 'ปิดเคส') {
-                actions += `<button class="btn btn-sm btn-link text-muted p-0 w-100 text-decoration-none" style="font-size:0.7rem;" onclick="openReassign('${clickId}', '${safeAssignee}')">ส่งต่อ</button>`;
-            }
-            actions += `<div class="d-flex justify-content-center gap-2 mt-1">
-                          <button class="btn btn-sm btn-link text-secondary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openHistoryModal('${clickId}')"><i class="fas fa-history me-1"></i>ประวัติ</button>
-                          ${item.status !== 'ปิดเคส' ? `<button class="btn btn-sm btn-link text-primary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openEditModal('${clickId}')"><i class="fas fa-pen"></i></button>` : ''}
-                        </div>`;
             
-            const profileUrl = item.maidId ? `https://admin-test.beneat.co/professional/${item.maidId.trim()}/profile` : '#';
+            if (item.status !== 'ปิดเคส') {
+                actions += '<button class="btn btn-sm btn-link text-muted p-0 w-100 text-decoration-none" style="font-size:0.7rem;" onclick="openReassign(\'' + clickId + '\', \'' + safeAssignee + '\')">ส่งต่อ</button>';
+            }
+            
+            let editBtnHtml = '';
+            if (item.status !== 'ปิดเคส') {
+                editBtnHtml = '<button class="btn btn-sm btn-link text-primary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openEditModal(\'' + clickId + '\')"><i class="fas fa-pen"></i></button>';
+            }
+            
+            actions += '<div class="d-flex justify-content-center gap-2 mt-1">' +
+                         '<button class="btn btn-sm btn-link text-secondary p-0 text-decoration-none" style="font-size:0.7rem;" onclick="openHistoryModal(\'' + clickId + '\')"><i class="fas fa-history me-1"></i>ประวัติ</button>' +
+                         editBtnHtml +
+                       '</div>';
+            
+            const t1 = smartTime(item.timeCreated); 
+            const t2 = smartTime(item.systemCreatedTime); 
+            const t3 = smartTime(item.timeAccepted); 
+            const t4 = smartTime(item.timeClosed); 
+            
+            const profileUrl = item.maidId ? 'https://admin-test.beneat.co/professional/' + String(item.maidId).trim() + '/profile' : '#';
+            let chatHtml = '-';
+            if (item.chatLink) {
+                chatHtml = '<a href="' + h(item.chatLink) + '" target="_blank" class="text-info"><i class="fas fa-comment-dots fs-5"></i></a>';
+            }
 
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="text-center"><span class="badge-status ${badge} mb-1">${h(item.status)}</span><div class="text-muted fw-bold" style="font-size:0.7rem;">${h(item.id)}</div></td>
-                <td>
-                    <div class="timeline-item"><span class="timeline-dot dot-purple"></span> ${smartTime(item.timeCreated)} <small class="text-muted ms-1">(Assign เวลา)</small></div>
-                    <div class="timeline-item"><span class="timeline-dot dot-blue"></span> ${smartTime(item.systemCreatedTime)} <small class="text-muted ms-1">(เปิดเคส)</small></div>
-                    ${item.timeAccepted ? `<div class="timeline-item"><span class="timeline-dot dot-yellow"></span> ${smartTime(item.timeAccepted)} <small class="text-muted ms-1">(รับ)</small></div>` : ''}
-                    ${item.timeClosed ? `<div class="timeline-item"><span class="timeline-dot dot-green"></span> ${smartTime(item.timeClosed)}<small class="text-muted ms-1">(ปิด)</small></div>` : ''}
-                </td>
-                <td><span class="badge bg-light text-dark border fw-normal shadow-sm">${h(calculateDuration(item.systemCreatedTime, item.timeClosed))}</span></td>
-                <td>
-                    <div class="fw-bold text-dark small">${h(getDisplayName(item.creator))}</div>
-                    <div class="text-primary small mt-1"><i class="fas fa-arrow-right me-1 text-muted opacity-50"></i>${h(getDisplayName(item.assignee))}</div>
-                </td>
-                <td>
-                    <a href='${profileUrl}' target="_blank" class="text-decoration-none">
-                        <div class="fw-bold text-primary">${h(item.maidId)}</div>
-                        <div class="small text-muted text-truncate" style="max-width: 110px;">${h(item.maidName)}</div>
-                    </a>
-                </td>
-                <td>${getTopicHtml(item.topic)}</td>
-                <td class="text-center">${item.chatLink ? `<a href="${h(item.chatLink)}" target="_blank" class="text-info"><i class="fas fa-comment-dots fs-5"></i></a>` : '-'}</td>
-                <td><div class="small text-muted text-wrap" style="max-width: 250px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">${h(item.actionDetails) || '<i class="opacity-25">ไม่มีข้อมูล</i>'}</div></td>
-                <td class="text-center">${actions}</td>
-            `;
+            tr.innerHTML = '' +
+                '<td class="text-center"><span class="badge-status ' + badge + ' mb-1">' + h(item.status) + '</span><div class="text-muted fw-bold" style="font-size:0.7rem;">' + h(item.id) + '</div></td>' +
+                '<td>' +
+                    '<div class="timeline-item"><span class="timeline-dot dot-purple"></span> ' + t1 + ' <small class="text-muted ms-1">(Assign เวลา)</small></div>' +
+                    '<div class="timeline-item"><span class="timeline-dot dot-blue"></span> ' + t2 + ' <small class="text-muted ms-1">(เปิดเคส)</small></div>' +
+                    '<div class="timeline-item"><span class="timeline-dot dot-yellow"></span> ' + t3 + ' <small class="text-muted ms-1">(รับ)</small></div>' +
+                    '<div class="timeline-item"><span class="timeline-dot dot-green"></span> ' + t4 + ' <small class="text-muted ms-1">(ปิด)</small></div>' +
+                '</td>' +
+                '<td><span class="badge bg-light text-dark border fw-normal shadow-sm">' + h(calculateDuration(item.systemCreatedTime, item.timeClosed)) + '</span></td>' +
+                '<td>' +
+                    '<div class="fw-bold text-dark small">' + h(getDisplayName(item.creator)) + '</div>' +
+                    '<div class="text-primary small mt-1"><i class="fas fa-arrow-right me-1 text-muted opacity-50"></i>' + h(getDisplayName(item.assignee)) + '</div>' +
+                '</td>' +
+                '<td>' +
+                    '<a href="' + profileUrl + '" target="_blank" class="text-decoration-none">' +
+                        '<div class="fw-bold text-primary">' + h(item.maidId) + '</div>' +
+                        '<div class="small text-muted text-truncate" style="max-width: 110px;">' + h(item.maidName) + '</div>' +
+                    '</a>' +
+                '</td>' +
+                '<td>' + getTopicHtml(item.topic) + '</td>' +
+                '<td class="text-center">' + chatHtml + '</td>' +
+                '<td><div class="small text-muted text-wrap" style="max-width: 250px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">' + (h(item.actionDetails) || '<i class="opacity-25">ไม่มีข้อมูล</i>') + '</div></td>' +
+                '<td class="text-center">' + actions + '</td>';
+            
             tbody.appendChild(tr);
         });
     }
@@ -1000,9 +1025,7 @@
                     const detailStr = lastReassign.details;
                     if (detailStr.includes(currentUserEmail) || detailStr.includes(getDisplayName(currentUserEmail))) {
                          const match = detailStr.match(/\(Note: (.*)\)/);
-                         if (match) {
-                             reassignNote = match[1];
-                         }
+                         if (match) reassignNote = match[1];
                     }
                 }
             } catch(e){}
@@ -1032,24 +1055,26 @@
 
                 let noteHtml = '';
                 if (item.reassignNote) {
-                    noteHtml = `<div class="mt-1 small text-info"><i class="fas fa-sticky-note me-1"></i>"${h(item.reassignNote)}"</div>`;
+                    noteHtml = '<div class="mt-1 small text-info"><i class="fas fa-sticky-note me-1"></i>"' + h(item.reassignNote) + '"</div>';
                 }
+
+                let iconClass = item.status === 'รอการประสานงาน' ? 'fa-clock text-danger' : 'fa-hourglass-half text-warning';
 
                 const li = document.createElement('li');
                 li.className = 'noti-item';
                 li.onclick = () => handleNotiClick(item.id);
-                li.innerHTML = `
-                    <div class="d-flex align-items-start">
-                        <i class="fas ${item.status === 'รอการประสานงาน' ? 'fa-clock text-danger' : 'fa-hourglass-half text-warning'} me-2 fs-6 mt-1"></i>
-                        <div class="flex-grow-1 overflow-hidden">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div class="fw-bold text-truncate small me-1">${h(getTopicText(item.topic))}</div>
-                                <div class="flex-shrink-0">${badgeHtml}</div>
-                            </div>
-                            <div class="text-muted text-truncate" style="font-size:0.75rem;">แม่บ้าน: ${h(item.maidName)} (${h(item.maidId)})</div>
-                            ${noteHtml}
-                        </div>
-                    </div>`;
+                li.innerHTML = '' +
+                    '<div class="d-flex align-items-start">' +
+                        '<i class="fas ' + iconClass + ' me-2 fs-6 mt-1"></i>' +
+                        '<div class="flex-grow-1 overflow-hidden">' +
+                            '<div class="d-flex align-items-center justify-content-between">' +
+                                '<div class="fw-bold text-truncate small me-1">' + h(getTopicText(item.topic)) + '</div>' +
+                                '<div class="flex-shrink-0">' + badgeHtml + '</div>' +
+                            '</div>' +
+                            '<div class="text-muted text-truncate" style="font-size:0.75rem;">แม่บ้าน: ' + h(item.maidName) + ' (' + h(item.maidId) + ')</div>' +
+                            noteHtml +
+                        '</div>' +
+                    '</div>';
                 notiContainer.appendChild(li);
             });
         } else {
@@ -1060,7 +1085,7 @@
 
     function handleNotiClick(caseId) {
         document.getElementById('searchInput').value = caseId;
-        if(tsInstances['filterAssignee']) tsInstances['filterAssignee'].setValue('all');
+        document.getElementById('filterAssignee').value = 'all';
         document.getElementById('filterDate').value = '';
         currentStatusFilter = 'all';
         if (!readCases.includes(caseId)) readCases.push(caseId);
@@ -1079,56 +1104,49 @@
         if(logs.length === 0) {
             container.innerHTML = '<div class="text-center text-muted py-3">ไม่มีประวัติการดำเนินการ</div>';
         } else {
+            let logsHtml = '';
             [...logs].reverse().forEach(log => {
                 const iconMap = { Create: 'fa-plus-circle text-primary', Accept: 'fa-hand-paper text-warning', Close: 'fa-check-circle text-success', Reassign: 'fa-exchange-alt text-info', Edit: 'fa-pen text-secondary' };
                 const actionMap = { Create: 'เปิดเคส', Accept: 'รับเคส', Close: 'ปิดเคส', Reassign: 'ส่งต่องาน', Edit: 'แก้ไขข้อมูล' };
+                let hIcon = iconMap[log.action] || 'fa-circle';
+                let actionText = actionMap[log.action] || log.action;
                 
-                container.innerHTML += `
-                    <div class="history-card ${log.action}">
-                        <div class="d-flex align-items-start">
-                            <div class="history-icon shadow-sm">
-                                <i class="fas ${iconMap[log.action] || 'fa-circle'} fs-5"></i>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="d-flex justify-content-between mb-1">
-                                    <span class="fw-bold text-dark">${actionMap[log.action] || log.action}</span>
-                                    <small class="text-muted">${h(log.timestamp)}</small>
-                                </div>
-                                <div class="small text-muted mb-2">โดย: ${h(getDisplayName(log.user))}</div>
-                                <div class="p-2 bg-light rounded text-secondary small border">${h(log.details) || '-'}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                logsHtml += '' +
+                    '<div class="history-card ' + log.action + '">' +
+                        '<div class="d-flex align-items-start">' +
+                            '<div class="history-icon shadow-sm">' +
+                                '<i class="fas ' + hIcon + ' fs-5"></i>' +
+                            '</div>' +
+                            '<div class="flex-grow-1">' +
+                                '<div class="d-flex justify-content-between mb-1">' +
+                                    '<span class="fw-bold text-dark">' + actionText + '</span>' +
+                                    '<small class="text-muted">' + h(log.timestamp) + '</small>' +
+                                '</div>' +
+                                '<div class="small text-muted mb-2">โดย: ' + h(getDisplayName(log.user)) + '</div>' +
+                                '<div class="p-2 bg-light rounded text-secondary small border">' + (h(log.details) || '-') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
             });
+            container.innerHTML = logsHtml;
         }
         historyModal.show();
     }
 
-    // 🌟 NEW: สร้างฟังก์ชันทำลายและสร้าง Tom Select ให้ Dropdown ใหม่ 🌟
     function populateConfigDropdowns(configs) {
-        
-        // เคลียร์ปลั๊กอินค้นหาของเก่าออกก่อน (ป้องกันบั๊กซ้อนกัน)
-        ['nc_assignee', 'ra_newAssignee', 'filterAssignee', 'nc_mainTopic', 'ec_mainTopic'].forEach(id => {
-            if (tsInstances[id]) {
-                tsInstances[id].destroy();
-                delete tsInstances[id];
-            }
-        });
-
-        let opts = `<option value="" selected disabled></option>`;
-        let optsFilter = `<option value="all">👤 เจ้าหน้าที่ทุกคน</option>`; 
+        let opts = '<option value="" selected disabled>-- เลือกผู้รับผิดชอบ --</option>';
+        let optsFilter = '<option value="all">👤 เจ้าหน้าที่ทุกคน</option>';
         
         if (configs.adminDetails && configs.adminDetails.length > 0) {
             configs.adminDetails.forEach(a => {
-                const label = `${h(a.name)} (${h(a.email)})`;
-                opts += `<option value="${h(a.email)}">${label}</option>`;
-                optsFilter += `<option value="${h(a.email)}">${label}</option>`;
+                const label = h(a.name) + ' (' + h(a.email) + ')';
+                opts += '<option value="' + h(a.email) + '">' + label + '</option>';
+                optsFilter += '<option value="' + h(a.email) + '">' + label + '</option>';
             });
         } else { 
             configs.admins.forEach(e => {
-                opts += `<option value="${h(e)}">${h(e)}</option>`;
-                optsFilter += `<option value="${h(e)}">${h(e)}</option>`;
+                opts += '<option value="' + h(e) + '">' + h(e) + '</option>';
+                optsFilter += '<option value="' + h(e) + '">' + h(e) + '</option>';
             });
         }
         
@@ -1136,41 +1154,20 @@
         document.getElementById('ra_newAssignee').innerHTML = opts;
         document.getElementById('filterAssignee').innerHTML = optsFilter; 
 
-        let opT = `<option value="" selected disabled></option>`;
-        configs.topicData.forEach((t, idx) => { opT += `<option value="${idx}">${h(t.main)}</option>`; });
+        let opT = '<option value="" selected disabled>-- เลือกหัวข้อหลัก --</option>';
+        configs.topicData.forEach((t, idx) => { opT += '<option value="' + idx + '">' + h(t.main) + '</option>'; });
         document.getElementById('nc_mainTopic').innerHTML = opT;
         document.getElementById('ec_mainTopic').innerHTML = opT;
-
-        // --- เริ่มต้นใช้งาน Tom Select ---
-        const baseTsConfig = { create: false, controlInput: '<input>' };
-
-        tsInstances['nc_assignee'] = new TomSelect('#nc_assignee', baseTsConfig);
-        tsInstances['ra_newAssignee'] = new TomSelect('#ra_newAssignee', baseTsConfig);
-        
-        tsInstances['filterAssignee'] = new TomSelect('#filterAssignee', {
-            ...baseTsConfig,
-            onChange: function() { renderTable(); }
-        });
-
-        tsInstances['nc_mainTopic'] = new TomSelect('#nc_mainTopic', {
-            ...baseTsConfig,
-            onChange: function() { renderSubTopics('nc'); }
-        });
-
-        tsInstances['ec_mainTopic'] = new TomSelect('#ec_mainTopic', {
-            ...baseTsConfig,
-            onChange: function() { renderSubTopics('ec'); }
-        });
     }
 
     function renderSubTopics(prefix) {
-        const mainIdx = document.getElementById(`${prefix}_mainTopic`).value;
-        const container = document.getElementById(`${prefix}_subTopicContainer`);
+        const mainIdx = document.getElementById(prefix + '_mainTopic').value;
+        const container = document.getElementById(prefix + '_subTopicContainer');
         container.innerHTML = '';
         
-        const otherDiv = document.getElementById(`${prefix}_otherInputDiv`);
+        const otherDiv = document.getElementById(prefix + '_otherInputDiv');
         otherDiv.classList.add('d-none');
-        document.getElementById(`${prefix}_otherDetail`).value = '';
+        document.getElementById(prefix + '_otherDetail').value = '';
 
         if (mainIdx === "" || mainIdx === null) return;
         
@@ -1196,22 +1193,11 @@
 
     function openNewCaseModal() {
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const mins = String(now.getMinutes()).padStart(2, '0');
-
-        document.getElementById('nc_caseDate').value = `${year}-${month}-${day}`;
-        document.getElementById('nc_caseTime').value = `${hours}:${mins}`;
-        
+        document.getElementById('nc_caseDate').value = now.toISOString().split('T')[0];
+        document.getElementById('nc_caseTime').value = now.toTimeString().slice(0,5);
         document.getElementById('nc_maidId').value = '';
         document.getElementById('nc_maidName').value = '';
-
-        // 🌟 เคลียร์ค่า Dropdown ทิ้งเมื่อเปิด Modal ใหม่ 🌟
-        if(tsInstances['nc_mainTopic']) tsInstances['nc_mainTopic'].setValue(""); 
-        if(tsInstances['nc_assignee']) tsInstances['nc_assignee'].setValue(""); 
-
+        document.getElementById('nc_mainTopic').value = ""; 
         document.getElementById('nc_subTopicContainer').innerHTML = '<span class="text-muted small align-self-center ps-2">กรุณาเลือกหัวข้อหลักก่อน</span>';
         document.getElementById('nc_otherInputDiv').classList.add('d-none');
         document.getElementById('nc_chatLink').value = '';
@@ -1228,7 +1214,7 @@
         if (activeSubs.includes(OTHERS_LABEL)) {
             const otherText = document.getElementById('nc_otherDetail').value.trim();
             activeSubs = activeSubs.filter(s => s !== OTHERS_LABEL);
-            activeSubs.push(`อื่นๆ: ${otherText || '-'}`);
+            activeSubs.push('อื่นๆ: ' + (otherText || '-'));
         }
 
         const form = {
@@ -1240,10 +1226,34 @@
         };
         if(!form.maidId || !form.assignee || !form.maidName) return Toast.fire({icon:'warning', title:'ระบุข้อมูลสำคัญให้ครบถ้วน'});
         setLoading('btnSubmitNewCase', true, 'กำลังเปิดเคส...');
+        
         google.script.run.withSuccessHandler(res => {
             setLoading('btnSubmitNewCase', false);
-            if(res.success) { newCaseModal.hide(); loadData(false); Toast.fire({icon:'success', title:'สำเร็จ'}); }
-            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
+            if(res.success) { 
+                newCaseModal.hide(); 
+                if (res.newCase) {
+                    rawData.unshift(res.newCase); 
+                    renderTable();
+                } else {
+                    loadData(false);
+                }
+                Toast.fire({icon:'success', title:'สำเร็จ'}); 
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาดจากฐานข้อมูล',
+                    text: res.message,
+                    confirmButtonColor: '#ef4444'
+                });
+            }
+        }).withFailureHandler(err => {
+            setLoading('btnSubmitNewCase', false);
+            Swal.fire({
+                icon: 'error',
+                title: 'ข้อผิดพลาดการเชื่อมต่ออินเทอร์เน็ต',
+                text: err.message,
+                confirmButtonColor: '#ef4444'
+            });
         }).createNewCase(form);
     }
 
@@ -1262,10 +1272,9 @@
 
         const mainIdx = configData.topicData.findIndex(t => t.main === curMain);
         if (mainIdx !== -1) {
-            // 🌟 อัปเดตค่า Dropdown ในหน้า Edit
-            if(tsInstances['ec_mainTopic']) tsInstances['ec_mainTopic'].setValue(mainIdx);
+            document.getElementById('ec_mainTopic').value = mainIdx;
+            renderSubTopics('ec');
             
-            // Re-select tags
             const tags = document.querySelectorAll('#ec_subTopicContainer .tag-selectable');
             const otherInput = document.getElementById('ec_otherDetail');
             const otherDiv = document.getElementById('ec_otherInputDiv');
@@ -1284,7 +1293,7 @@
                 }
             });
         } else {
-            if(tsInstances['ec_mainTopic']) tsInstances['ec_mainTopic'].setValue("");
+            document.getElementById('ec_mainTopic').value = "";
             document.getElementById('ec_subTopicContainer').innerHTML = "";
         }
         editCaseModal.show();
@@ -1299,11 +1308,12 @@
         if (activeSubs.includes(OTHERS_LABEL)) {
             const otherText = document.getElementById('ec_otherDetail').value.trim();
             activeSubs = activeSubs.filter(s => s !== OTHERS_LABEL);
-            activeSubs.push(`อื่นๆ: ${otherText || '-'}`);
+            activeSubs.push('อื่นๆ: ' + (otherText || '-'));
         }
 
+        const id = document.getElementById('ec_id').value;
         const form = {
-            id: document.getElementById('ec_id').value,
+            id: id,
             maidId: document.getElementById('ec_maidId').value.trim(),
             maidName: document.getElementById('ec_maidName').value.trim(),
             chatLink: document.getElementById('ec_chatLink').value.trim(),
@@ -1311,59 +1321,59 @@
         };
         if(!form.maidId || !form.maidName) return Toast.fire({icon:'warning', title:'ระบุข้อมูลแม่บ้านให้ครบถ้วน'});
         setLoading('btnSubmitEditCase', true, 'กำลังบันทึก...');
+        
         google.script.run.withSuccessHandler(res => {
             setLoading('btnSubmitEditCase', false);
             if(res.success) { 
                 editCaseModal.hide(); 
-                loadData(false); 
+                
+                const item = rawData.find(x => x.id === id);
+                if (item) {
+                    item.maidId = form.maidId;
+                    item.maidName = form.maidName;
+                    item.chatLink = form.chatLink;
+                    item.topic = JSON.stringify(form.topicObj);
+                    try {
+                        const logs = JSON.parse(item.historyLogs || "[]");
+                        logs.push({ timestamp: res.timestamp, action: "Edit", user: currentUserEmail, details: "แก้ไขข้อมูลเคส" });
+                        item.historyLogs = JSON.stringify(logs);
+                    } catch(e) {}
+                    renderTable();
+                }
+                
                 Toast.fire({icon:'success', title:'แก้ไขสำเร็จ'}); 
             } else {
-                Toast.fire({icon:'error', title:res.message});
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาดจากฐานข้อมูล',
+                    text: res.message,
+                    confirmButtonColor: '#ef4444'
+                });
             }
+        }).withFailureHandler(err => {
+            setLoading('btnSubmitEditCase', false);
+            Swal.fire({
+                icon: 'error',
+                title: 'ข้อผิดพลาดการเชื่อมต่อ',
+                text: err.message,
+                confirmButtonColor: '#ef4444'
+            });
         }).updateCaseInfo(form);
     }
 
     function handleMaidIdInput() {
-        const idInput = document.getElementById('nc_maidId');
-        const nameInput = document.getElementById('nc_maidName');
-        const val = idInput.value.trim().toLowerCase();
-        
-        const dl = document.getElementById('maidOptions'); 
-        dl.innerHTML = '';
-        
-        if (val.length > 0) {
-            const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val));
-            filtered.slice(0, 20).forEach(m => dl.innerHTML += `<option value="${h(m.id)}">${h(m.name)}</option>`);
-            
-            const exactMatch = maidDatabase.find(m => m.id.toLowerCase() === val || m.name.toLowerCase() === val);
-            
-            if (exactMatch) {
-                idInput.value = exactMatch.id;
-                nameInput.value = exactMatch.name;
-            } else {
-                nameInput.value = '';
-            }
-        } else {
-            nameInput.value = '';
-        }
+        const val = document.getElementById('nc_maidId').value.trim().toLowerCase();
+        const match = maidDatabase.find(m => m.id === val);
+        if (match) document.getElementById('nc_maidName').value = match.name;
+        const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val));
+        const dl = document.getElementById('maidOptions'); dl.innerHTML = '';
+        filtered.slice(0, 20).forEach(m => dl.innerHTML += '<option value="' + h(m.id) + '">' + h(m.name) + '</option>');
     }
 
     function handleEditMaidIdInput() {
-        const idInput = document.getElementById('ec_maidId');
-        const nameInput = document.getElementById('ec_maidName');
-        const val = idInput.value.trim().toLowerCase();
-        
-        if (val.length > 0) {
-            const exactMatch = maidDatabase.find(m => m.id.toLowerCase() === val || m.name.toLowerCase() === val);
-            if (exactMatch) {
-                idInput.value = exactMatch.id;
-                nameInput.value = exactMatch.name;
-            } else {
-                nameInput.value = '';
-            }
-        } else {
-            nameInput.value = '';
-        }
+        const val = document.getElementById('ec_maidId').value.trim().toLowerCase();
+        const match = maidDatabase.find(m => m.id === val);
+        if (match) document.getElementById('ec_maidName').value = match.name;
     }
 
     function submitAddNewMaid() {
@@ -1371,16 +1381,51 @@
         const name = document.getElementById('nc_maidName').value.trim();
         if(!id || !name) return Toast.fire({ icon: 'warning', title: 'ระบุข้อมูลให้ครบ' });
         google.script.run.withSuccessHandler(res => { 
-            if(res.success) { loadMaidData(); Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' }); }
-            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
+            if(res.success) {
+                loadMaidData(); Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' }); 
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: res.message,
+                    confirmButtonColor: '#ef4444'
+                });
+            }
         }).addNewMaid(id, name);
     }
 
     function acceptCase(id, btn) {
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         google.script.run.withSuccessHandler(res => { 
-            if(res.success) { loadData(false); }
-            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); btn.disabled = false; btn.innerHTML = 'รับเคส'; }
+            if(res.success) {
+                const item = rawData.find(x => x.id === id);
+                if (item) {
+                    item.status = "กำลังประสานงาน";
+                    item.timeAccepted = res.timestamp;
+                    try {
+                        const logs = JSON.parse(item.historyLogs || "[]");
+                        logs.push({ timestamp: res.timestamp, action: "Accept", user: currentUserEmail, details: "รับเคส" });
+                        item.historyLogs = JSON.stringify(logs);
+                    } catch(e) {}
+                    renderTable();
+                }
+            } else {
+                btn.disabled = false; btn.innerHTML = 'รับเคส';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: res.message,
+                    confirmButtonColor: '#ef4444'
+                });
+            }
+        }).withFailureHandler(err => {
+            btn.disabled = false; btn.innerHTML = 'รับเคส';
+            Swal.fire({
+                icon: 'error',
+                title: 'ข้อผิดพลาดการเชื่อมต่อ',
+                text: err.message,
+                confirmButtonColor: '#ef4444'
+            });
         }).acceptCase(id);
     }
 
@@ -1398,8 +1443,29 @@
         setLoading('btnUpdateDetails', true);
         google.script.run.withSuccessHandler(res => { 
             setLoading('btnUpdateDetails', false); 
-            if(res.success) { manageCaseModal.hide(); loadData(false); }
-            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
+            if(res.success) {
+                manageCaseModal.hide(); 
+                const item = rawData.find(x => x.id === id);
+                if (item) {
+                    item.actionDetails = details;
+                    renderTable();
+                }
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: res.message,
+                    confirmButtonColor: '#ef4444'
+                });
+            }
+        }).withFailureHandler(err => {
+            setLoading('btnUpdateDetails', false);
+            Swal.fire({
+                icon: 'error',
+                title: 'ข้อผิดพลาดการเชื่อมต่อ',
+                text: err.message,
+                confirmButtonColor: '#ef4444'
+            });
         }).updateActionDetails(id, details);
     }
 
@@ -1410,17 +1476,42 @@
         setLoading('btnCloseCase', true, 'กำลังปิดเคส...');
         google.script.run.withSuccessHandler(res => { 
             setLoading('btnCloseCase', false); 
-            if(res.success) { manageCaseModal.hide(); loadData(false); }
-            else { Swal.fire('เกิดข้อผิดพลาด', res.message, 'error'); }
+            if(res.success) {
+                manageCaseModal.hide(); 
+                const item = rawData.find(x => x.id === id);
+                if (item) {
+                    item.status = "ปิดเคส";
+                    item.actionDetails = details;
+                    item.timeClosed = res.timestamp;
+                    try {
+                        const logs = JSON.parse(item.historyLogs || "[]");
+                        logs.push({ timestamp: res.timestamp, action: "Close", user: currentUserEmail, details: 'ปิดเคส: ' + details });
+                        item.historyLogs = JSON.stringify(logs);
+                    } catch(e) {}
+                    renderTable();
+                }
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: res.message,
+                    confirmButtonColor: '#ef4444'
+                });
+            }
+        }).withFailureHandler(err => {
+            setLoading('btnCloseCase', false);
+            Swal.fire({
+                icon: 'error',
+                title: 'ข้อผิดพลาดการเชื่อมต่อ',
+                text: err.message,
+                confirmButtonColor: '#ef4444'
+            });
         }).closeCase(id, details);
     }
 
     function openReassign(id, current) {
         document.getElementById('ra_id').value = id;
-        // 🌟 อัปเดตค่าให้ Modal ส่งต่อ 🌟
-        if(tsInstances['ra_newAssignee']) {
-            tsInstances['ra_newAssignee'].setValue(current);
-        }
+        document.getElementById('ra_newAssignee').value = current;
         document.getElementById('ra_note').value = ''; 
         reassignModal.show();
     }
@@ -1435,23 +1526,45 @@
             setLoading('btnSubmitReassign', false); 
             if(res.success) {
                 reassignModal.hide(); 
-                loadData(false); 
+                const item = rawData.find(x => x.id === id);
+                if (item) {
+                    item.assignee = target;
+                    try {
+                        const logs = JSON.parse(item.historyLogs || "[]");
+                        logs.push({ timestamp: res.timestamp, action: "Reassign", user: currentUserEmail, details: 'ส่งต่อ: ...' });
+                        item.historyLogs = JSON.stringify(logs);
+                    } catch(e) {}
+                    renderTable();
+                }
                 Toast.fire({ icon: 'success', title: 'ส่งต่องานเรียบร้อย' });
             } else {
-                Swal.fire('เกิดข้อผิดพลาด', res.message, 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาด',
+                    text: res.message,
+                    confirmButtonColor: '#ef4444'
+                });
             }
+        }).withFailureHandler(err => {
+            setLoading('btnSubmitReassign', false);
+            Swal.fire({
+                icon: 'error',
+                title: 'ข้อผิดพลาดการเชื่อมต่อ',
+                text: err.message,
+                confirmButtonColor: '#ef4444'
+            });
         }).reassignCase(id, target, note);
     }
 
     function loadMaidData() { google.script.run.withSuccessHandler(res => { maidDatabase = res || []; }).getAllMaids(); }
 
     function updateDashboard(stats) {
-        document.getElementById('dashCountPending').textContent = `${stats.pending} เคส`;
-        document.getElementById('dashPctPending').textContent = `${stats.pendingPct}%`;
-        document.getElementById('dashCountProgress').textContent = `${stats.progress} เคส`;
-        document.getElementById('dashPctProgress').textContent = `${stats.progressPct}%`;
-        document.getElementById('dashCountClosed').textContent = `${stats.closed} เคส`;
-        document.getElementById('dashPctClosed').textContent = `${stats.closedPct}%`;
+        document.getElementById('dashCountPending').textContent = stats.pending + ' เคส';
+        document.getElementById('dashPctPending').textContent = stats.pendingPct + '%';
+        document.getElementById('dashCountProgress').textContent = stats.progress + ' เคส';
+        document.getElementById('dashPctProgress').textContent = stats.progressPct + '%';
+        document.getElementById('dashCountClosed').textContent = stats.closed + ' เคส';
+        document.getElementById('dashPctClosed').textContent = stats.closedPct + '%';
         document.getElementById('totalCases').textContent = stats.total;
     }
   </script>
