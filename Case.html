@@ -1361,20 +1361,95 @@
         }).updateCaseInfo(form);
     }
 
-    function handleMaidIdInput() {
-        const val = document.getElementById('nc_maidId').value.trim().toLowerCase();
-        const match = maidDatabase.find(m => m.id === val);
-        if (match) document.getElementById('nc_maidName').value = match.name;
-        const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val));
-        const dl = document.getElementById('maidOptions'); dl.innerHTML = '';
-        filtered.slice(0, 20).forEach(m => dl.innerHTML += '<option value="' + h(m.id) + '">' + h(m.name) + '</option>');
+    // --- ส่วนประมวลผล Local Storage & API Search ---
+    
+    // ฟังก์ชันโหลดข้อมูลแม่บ้านแบบ Caching (ลด Bandwidth)
+    function loadMaidData() { 
+        const cachedData = localStorage.getItem('maid_db_cache');
+        const cacheTimestamp = localStorage.getItem('maid_db_time');
+        const now = new Date().getTime();
+
+        // หากมี Cache และอายุยังไม่เกิน 12 ชั่วโมง ให้ดึงมาใช้เลย!
+        if (cachedData && cacheTimestamp && (now - cacheTimestamp < 43200000)) {
+            try {
+                maidDatabase = JSON.parse(cachedData);
+                console.log("Loaded Maids from Cache! (Bandwidth saved)");
+                return; // จบการทำงาน ไม่ต้องเรียก Server
+            } catch(e) {
+                console.error("Cache parsing error");
+            }
+        }
+
+        // หากไม่มี Cache ค่อยเรียกผ่าน Google Apps Script
+        google.script.run.withSuccessHandler(res => { 
+            maidDatabase = res || []; 
+            try {
+                // บันทึกลง Cache ไว้ใช้รอบหน้า
+                localStorage.setItem('maid_db_cache', JSON.stringify(maidDatabase));
+                localStorage.setItem('maid_db_time', now.toString());
+            } catch(e) {
+                console.warn("Local storage is full");
+            }
+        }).getAllMaids(); 
     }
 
+    // ตัวแปรเก็บเวลาหน่วงสำหรับ Debounce
+    let searchMaidTimer; 
+
+    // ฟังก์ชันค้นหาแม่บ้านตอนกรอกข้อมูลสร้างเคสใหม่
+    function handleMaidIdInput() {
+        const val = document.getElementById('nc_maidId').value.trim();
+        if (val.length < 2) return; // พิมพ์น้อยกว่า 2 ตัวอักษรยังไม่ต้องค้นหา
+        
+        // --- 1. ค้นหาจาก Local Cache ก่อน (ลดการโหลด 100%) ---
+        if (maidDatabase && maidDatabase.length > 0) {
+            const lowerVal = val.toLowerCase();
+            const match = maidDatabase.find(m => m.id.toLowerCase() === lowerVal);
+            if (match) document.getElementById('nc_maidName').value = match.name;
+            
+            const filtered = maidDatabase.filter(m => m.id.toLowerCase().includes(lowerVal) || m.name.toLowerCase().includes(lowerVal));
+            const dl = document.getElementById('maidOptions'); 
+            dl.innerHTML = '';
+            filtered.slice(0, 20).forEach(m => dl.innerHTML += `<option value="${h(m.id)}">${h(m.name)}</option>`);
+            return;
+        }
+
+        // --- 2. หากใน Cache ไม่มี (กรณีไม่ได้เปิดใช้วิธีที่ 1) ให้ค้นหาผ่าน API พร้อม Debounce ---
+        document.getElementById('maidLoadingIcon').style.display = 'block';
+
+        // หน่วงเวลา 500ms ป้องกันการยิง API รัวๆ ทุกตัวอักษร
+        clearTimeout(searchMaidTimer);
+        searchMaidTimer = setTimeout(() => {
+            google.script.run.withSuccessHandler(res => {
+                document.getElementById('maidLoadingIcon').style.display = 'none';
+                const dl = document.getElementById('maidOptions'); 
+                dl.innerHTML = '';
+                
+                // ใส่ผลลัพธ์ลง Datalist
+                res.forEach(m => {
+                    dl.innerHTML += `<option value="${h(m.id)}">${h(m.name)}</option>`;
+                });
+
+                // ถ้าพิมพ์รหัสเป๊ะ ให้ Auto-fill ชื่อ
+                const match = res.find(m => m.id.toLowerCase() === val.toLowerCase());
+                if (match) document.getElementById('nc_maidName').value = match.name;
+                
+            }).withFailureHandler(() => {
+                document.getElementById('maidLoadingIcon').style.display = 'none';
+            }).searchMaidsFromDB(val);
+        }, 500); 
+    }
+
+    // ฟังก์ชันช่วยเติมชื่อแม่บ้านสำหรับการ "แก้ไขเคส" จาก Local Cache
     function handleEditMaidIdInput() {
         const val = document.getElementById('ec_maidId').value.trim().toLowerCase();
-        const match = maidDatabase.find(m => m.id === val);
-        if (match) document.getElementById('ec_maidName').value = match.name;
+        if (maidDatabase && maidDatabase.length > 0) {
+            const match = maidDatabase.find(m => m.id.toLowerCase() === val);
+            if (match) document.getElementById('ec_maidName').value = match.name;
+        }
     }
+
+    // -------------------------------------------------------------
 
     function submitAddNewMaid() {
         const id = document.getElementById('nc_maidId').value.trim();
@@ -1382,7 +1457,11 @@
         if(!id || !name) return Toast.fire({ icon: 'warning', title: 'ระบุข้อมูลให้ครบ' });
         google.script.run.withSuccessHandler(res => { 
             if(res.success) {
-                loadMaidData(); Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' }); 
+                // หากเพิ่มสำเร็จให้เคลียร์ Cache เพื่อบังคับให้โหลดใหม่ครั้งถัดไป
+                localStorage.removeItem('maid_db_cache'); 
+                localStorage.removeItem('maid_db_time');
+                loadMaidData(); 
+                Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' }); 
             } else {
                 Swal.fire({
                     icon: 'error',
@@ -1555,8 +1634,6 @@
             });
         }).reassignCase(id, target, note);
     }
-
-    function loadMaidData() { google.script.run.withSuccessHandler(res => { maidDatabase = res || []; }).getAllMaids(); }
 
     function updateDashboard(stats) {
         document.getElementById('dashCountPending').textContent = stats.pending + ' เคส';
