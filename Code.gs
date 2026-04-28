@@ -124,19 +124,29 @@ function formatDbDateToTh(dbDateStr) {
 }
 
 /**
- * ดึงข้อมูล Case ทั้งหมดแบบ Pagination
+ * ดึงข้อมูล Case ทั้งหมดแบบ Pagination (แก้ไขใหม่: มีการจำกัดวันเพื่อลด Bandwidth)
  */
-function fetchCasesAsArray() {
-   Logger.log("กำลังดึงข้อมูล Case ทั้งหมดจาก Supabase...");
+function fetchCasesAsArray(targetDateStr = null) {
+   Logger.log("กำลังดึงข้อมูล Case จาก Supabase...");
    let allCases = [];
    let offset = 0;
    const limit = 1000;
    let hasMore = true;
 
+   // 🌟 จำกัดให้ดึงข้อมูลเฉพาะ 60 วันย้อนหลัง (หรือดึงทั้งหมดถ้ากด Load All)
+   let limitDateStr = '2020-01-01T00:00:00Z'; // ค่าตั้งต้นแบบดึงทั้งหมด
+   
+   if (targetDateStr !== 'ALL') {
+       const d = new Date();
+       d.setDate(d.getDate() - 60); // 60 วันย้อนหลัง
+       limitDateStr = d.toISOString();
+   }
+
    while (hasMore) {
        try {
-           // 🌟 แก้ไข: จัดเรียงด้วย Primary Key (id) แทนข้อความ เพื่อให้ดึงข้อมูลได้เป๊ะ 100% ไม่มีฟันหลอ
-           const endpoint = `Database_Cases?select=*&limit=${limit}&offset=${offset}&order=id.desc`;
+           // ใช้ filter Time_Created แบบ gte (มากกว่าหรือเท่ากับ) เพื่อไม่ให้โหลดข้อมูลเก่าเกินความจำเป็น
+           // ปรับปรุง: เรียงจาก %22Case%20ID%22 แทน id
+           let endpoint = `Database_Cases?select=*&limit=${limit}&offset=${offset}&Time_Created=gte.${limitDateStr}&order=%22Case%20ID%22.desc`;
            const res = supabaseRequest(endpoint, 'GET');
            
            if (res && Array.isArray(res) && res.length > 0) {
@@ -211,6 +221,23 @@ function getAllMaids() {
     return allMaids.map(r => ({ id: String(r.maid_id).trim(), name: String(r.maid_name).trim() })).filter(item => item.id !== "");
   }
   
+  return [];
+}
+
+/**
+ * 🌟 เพิ่มใหม่: ค้นหาแม่บ้านจาก Supabase ตาม Keyword (Search on Type)
+ * เพื่อลดภาระ Bandwidth ไม่ต้องโหลดรายชื่อแม่บ้านเป็นหมื่นๆ คนในครั้งเดียว
+ */
+function searchMaidsFromDB(keyword) {
+  if (!keyword || keyword.length < 2) return [];
+  
+  // ใช้ ilike เพื่อค้นหาแบบ Partial Match (พิมพ์ไม่เต็มคำก็เจอ)
+  const endpoint = `Database_Maids?select=maid_id,maid_name&or=(maid_id.ilike.*${encodeURIComponent(keyword)}*,maid_name.ilike.*${encodeURIComponent(keyword)}*)&limit=15`;
+  const res = supabaseRequest(endpoint, 'GET');
+  
+  if (res && !res.error && Array.isArray(res)) {
+      return res.map(r => ({ id: String(r.maid_id).trim(), name: String(r.maid_name).trim() }));
+  }
   return [];
 }
 
@@ -358,14 +385,15 @@ function removeCaseConfigItem(type, value) {
 // --- CORE DATA FUNCTIONS (Main Case) ---
 // ------------------------------------------
 
-function getCasesData() {
+function getCasesData(targetDateStr = null) {
   const currentUser = Session.getActiveUser().getEmail();
   const canConfig = checkIsSuperAdmin(currentUser);
 
   let data = [];
   let stats = { total: 0, pending: 0, progress: 0, closed: 0 };
 
-  const values = fetchCasesAsArray();
+  // 🌟 ส่งค่าวันที่เป้าหมายไปให้ fetch เพื่อลดโควต้า Bandwidth
+  const values = fetchCasesAsArray(targetDateStr);
 
   if (values.length > 0) {
     data = values.map((row, index) => {
@@ -409,7 +437,10 @@ function getCasesData() {
 }
 
 function createNewCase(form) {
+  // 🌟 ป้องกันปัญหาการสร้างเคสพร้อมกัน (Race Condition) โดยบังคับให้รอคิวทำทีละครั้ง
+  const lock = LockService.getScriptLock();
   try {
+    lock.waitLock(10000); // รอคิวได้สูงสุด 10 วินาที
     const user = Session.getActiveUser().getEmail();
     
     let createdTimeStr;
@@ -424,7 +455,9 @@ function createNewCase(form) {
     const prefix = `CASE-${year}-`;
     let maxSeq = 0;
     
-    const latestCase = supabaseRequest(`Database_Cases?select=%22Case%20ID%22&%22Case%20ID%22=like.${prefix}*&order=id.desc&limit=1`, 'GET');
+    // 🌟 แก้ไข: จัดเรียงด้วยคอลัมน์ Case ID โดยตรงแบบ Descending เพื่อให้ได้เลขเคสมากที่สุดของปีเสมอ
+    // (ใช้ %22Case%20ID%22 แทน id เพราะหาก id ไม่รันลำดับ จะทำให้ได้เลขเคสแบบสุ่ม)
+    const latestCase = supabaseRequest(`Database_Cases?select=%22Case%20ID%22&%22Case%20ID%22=like.${prefix}*&order=%22Case%20ID%22.desc&limit=1`, 'GET');
     if (latestCase && latestCase.length > 0 && latestCase[0]['Case ID']) {
         maxSeq = parseInt(latestCase[0]['Case ID'].split('-')[2]);
     }
@@ -453,14 +486,17 @@ function createNewCase(form) {
         "History Logs": JSON.stringify([newLog]) 
     };
 
-    // 🌟 แก้ไข: พิมพ์ชื่อตารางให้ถูกต้อง (เอาแท็กประหลาดออก)
     const res = supabaseRequest('Database_Cases', 'POST', payload);
     if (!res || res.error) {
       throw new Error("Insert failed: " + JSON.stringify(res));
     }
     
     return { success: true };
-  } catch (e) { return { success: false, message: e.toString() }; }
+  } catch (e) { 
+    return { success: false, message: e.toString() }; 
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function acceptCase(caseId) {
@@ -608,7 +644,7 @@ function getTopicCases(dateStr, topicName) {
     } catch (e) { return null; }
   };
 
-  const data = fetchCasesAsArray();
+  const data = fetchCasesAsArray('ALL'); // หน้า Dashboard ควรดึงข้อมูลทั้งหมดมาคำนวณกราฟ
   if (data.length === 0) return [];
   
   let targetDateStr = dateStr; 
@@ -671,7 +707,7 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
     topicStats: []
   };
 
-  const data = fetchCasesAsArray();
+  const data = fetchCasesAsArray('ALL'); // ดึงแบบ ALL สำหรับหน้า Dashboard 
   if (data.length === 0) return emptyResult;
   
   let totalOpenAccept = 0, countOpenAccept = 0;
@@ -876,7 +912,7 @@ function getDashboardStatsAndCases(viewMode, filterValue, filterAssignee) {
   const stats = getDashboardStats(viewMode, filterValue, filterAssignee);
   let cases = [];
   
-  const data = fetchCasesAsArray();
+  const data = fetchCasesAsArray('ALL'); 
   
   if (data.length > 0) {
     const parseDate = (str) => {
