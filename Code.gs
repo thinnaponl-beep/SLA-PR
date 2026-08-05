@@ -3,8 +3,8 @@
 // ==========================================
 
 // --- Supabase Config (New Project) ---
-const SUPABASE_URL = ''; 
-const SUPABASE_KEY = '';
+const SUPABASE_URL = 'https://apsnkqgrkjtfsiydjcfd.supabase.co'; 
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwc25rcWdya2p0ZnNpeWRqY2ZkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjMwNjcwMywiZXhwIjoyMDkxODgyNzAzfQ.xlnbmC9rTuvoa8vGmvi1Oufik-zxifQpBrYL9sXAySI';
 
 /**
  * 1. Entry Point: จัดการ Routing
@@ -39,9 +39,15 @@ function getScriptUrl() {
  * ตรวจสอบสิทธิ์ Super Admin ภายใน Server Script (ดึงจาก Supabase)
  */
 function checkIsSuperAdmin(email) {
-  const res = supabaseRequest(`Config_System?config_type=eq.super_admin&value1=eq.${encodeURIComponent(email)}&select=value1`, 'GET');
-  if (res && !res.error && Array.isArray(res) && res.length > 0) {
-    return true;
+  try {
+    // 🌟 Gustavoz Optimization: ใช้ข้อมูลจาก Cache ผ่าน getCaseConfigs() แทนการยิง API สดทุกครั้ง
+    // ป้องกันการเสียแบนด์วิดท์ฟรีๆ เวลารีเฟรชหน้าตาราง
+    const configs = getCaseConfigs();
+    if (configs && configs.superAdmins && configs.superAdmins.includes(email)) {
+      return true;
+    }
+  } catch (e) {
+    Logger.log("checkIsSuperAdmin Error: " + e);
   }
   return false;
 }
@@ -133,20 +139,26 @@ function fetchCasesAsArray(targetDateStr = null) {
    const limit = 1000;
    let hasMore = true;
 
-   // 🌟 จำกัดให้ดึงข้อมูลเฉพาะ 60 วันย้อนหลัง (หรือดึงทั้งหมดถ้ากด Load All)
-   let limitDateStr = '2020-01-01T00:00:00Z'; // ค่าตั้งต้นแบบดึงทั้งหมด
-   
+   let queryFilter = "";
+
+   // 🌟 Gustavoz Optimization: หากขอข้อมูล ALL จะไม่ใส่ filter วันที่เลยเพื่อป้องกัน Supabase คืนค่าว่างเปล่า
    if (targetDateStr !== 'ALL') {
        const d = new Date();
        d.setDate(d.getDate() - 60); // 60 วันย้อนหลัง
-       limitDateStr = d.toISOString();
+       
+       // 🌟 ปรับ Format ให้ตรงกับที่บันทึกลงไปเป๊ะๆ (YYYY-MM-DD HH:mm:ss) 
+       let limitDateStr = Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+       let safeLimitDate = encodeURIComponent(limitDateStr);
+       queryFilter = `&%22Time_Created%22=gte.${safeLimitDate}`;
    }
+
+   // 🌟 ป้องกัน Quota Bandwidth เต็ม และครอบชื่อคอลัมน์ด้วยเครื่องหมายคำพูดให้ปลอดภัย
+   const selectCols = encodeURIComponent('"Case ID",Status,"Time_Created","Time_Accepted","Time_Closed",Creator,Assignee,"Maid ID","Maid Name",Topic,"Chat Link","Action Details","History Logs"');
 
    while (hasMore) {
        try {
-           // ใช้ filter Time_Created แบบ gte (มากกว่าหรือเท่ากับ) เพื่อไม่ให้โหลดข้อมูลเก่าเกินความจำเป็น
-           // ปรับปรุง: เรียงจาก %22Case%20ID%22 แทน id
-           let endpoint = `Database_Cases?select=*&limit=${limit}&offset=${offset}&Time_Created=gte.${limitDateStr}&order=%22Case%20ID%22.desc`;
+           // 🌟 นำ queryFilter มาต่อท้าย (ถ้าเป็น ALL ส่วนนี้จะว่างเปล่า)
+           let endpoint = `Database_Cases?select=${selectCols}&limit=${limit}&offset=${offset}${queryFilter}&order=%22Case%20ID%22.desc`;
            const res = supabaseRequest(endpoint, 'GET');
            
            if (res && Array.isArray(res) && res.length > 0) {
@@ -696,7 +708,7 @@ function getTopicCases(dateStr, topicName) {
   return result;
 }
 
-function getDashboardStats(viewMode, filterValue, filterAssignee) {
+function getDashboardStats(viewMode, filterValue, filterAssignee, preloadedData = null) {
   const emptyResult = { 
     avgOpenAccept: '-', 
     avgAcceptClose: '-', 
@@ -707,7 +719,8 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
     topicStats: []
   };
 
-  const data = fetchCasesAsArray('ALL'); // ดึงแบบ ALL สำหรับหน้า Dashboard 
+  // 🌟 Optimization: รับข้อมูลมาจาก getDashboardStatsAndCases จะได้ไม่ต้องยิง fetch ซ้ำสองรอบ
+  const data = preloadedData || fetchCasesAsArray('ALL'); 
   if (data.length === 0) return emptyResult;
   
   let totalOpenAccept = 0, countOpenAccept = 0;
@@ -761,8 +774,13 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
       configs.adminDetails.forEach(a => { if(a.email) adminNames[a.email] = a.name; });
   }
 
+  const targetMonthsRaw = Array.isArray(filterValue) ? filterValue : (filterValue && filterValue !== 'all' ? [filterValue] : []);
+  const targetMonths = targetMonthsRaw.map(m => m === 'current_month' ? currentMonthKey : m);
+  
+  const targetAssignees = Array.isArray(filterAssignee) ? filterAssignee : (filterAssignee && filterAssignee !== 'all' ? [filterAssignee] : []);
+
   let refValue = ""; 
-  if (viewMode === 'day' && filterValue) {
+  if (viewMode === 'day' && filterValue && typeof filterValue === 'string') {
       const selectedDate = new Date(filterValue);
       selectedDate.setDate(selectedDate.getDate() - 1); 
       refValue = Utilities.formatDate(selectedDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -800,18 +818,27 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
         availableAssignees.add(JSON.stringify({email: assignee, label: displayName}));
     }
 
-    const isTargetAssignee = (!filterAssignee || filterAssignee === 'all' || assignee === filterAssignee);
+    const isTargetAssignee = (targetAssignees.length === 0 || targetAssignees.includes('all') || targetAssignees.includes(assignee));
+    
     if (isTargetAssignee) {
         let matchRef = false;
-        if (viewMode === 'day' && rowDateKey === refValue) matchRef = true;
+        if (viewMode === 'day' && typeof filterValue === 'string' && rowDateKey === refValue) matchRef = true;
         if (viewMode === 'month' && rowMonthKey === refValue) matchRef = true;
         if (matchRef) {
             comparisonData.reference.total++;
             if (status === 'ปิดเคส') comparisonData.reference.closed++;
         }
+        
         let matchSelected = false;
-        if (viewMode === 'day' && rowDateKey === filterValue) matchSelected = true;
-        if (viewMode === 'month' && rowMonthKey === filterValue) matchSelected = true;
+        if (viewMode === 'day' && typeof filterValue === 'string' && rowDateKey === filterValue) matchSelected = true;
+        if (viewMode === 'month') {
+            if (targetMonths.length > 0 && !targetMonths.includes('all')) {
+                if (targetMonths.includes(rowMonthKey)) matchSelected = true;
+            } else {
+                matchSelected = true; 
+            }
+        }
+        
         if (matchSelected) {
             comparisonData.selected.total++;
             if (status === 'ปิดเคส') comparisonData.selected.closed++;
@@ -819,9 +846,11 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
     }
 
     let includeRow = true;
-    if (viewMode === 'day' && filterValue && rowDateKey !== filterValue) includeRow = false;
-    if (viewMode === 'month' && filterValue && filterValue !== 'all' && rowMonthKey !== filterValue) includeRow = false;
-    if (filterAssignee && filterAssignee !== 'all' && assignee !== filterAssignee) includeRow = false;
+    if (viewMode === 'day' && typeof filterValue === 'string' && filterValue && rowDateKey !== filterValue) includeRow = false;
+    if (viewMode === 'month' && targetMonths.length > 0 && !targetMonths.includes('all')) {
+        if (!targetMonths.includes(rowMonthKey)) includeRow = false;
+    }
+    if (targetAssignees.length > 0 && !targetAssignees.includes('all') && !targetAssignees.includes(assignee)) includeRow = false;
 
     if (!includeRow) return;
 
@@ -909,10 +938,10 @@ function getDashboardStats(viewMode, filterValue, filterAssignee) {
 }
 
 function getDashboardStatsAndCases(viewMode, filterValue, filterAssignee) {
-  const stats = getDashboardStats(viewMode, filterValue, filterAssignee);
-  let cases = [];
-  
+  // 🌟 Optimization: ดึงข้อมูลครั้งเดียว ส่งให้ DashboardStats ไปคำนวณกราฟ เพื่อประหยัดแบนด์วิดท์ลงครึ่งหนึ่ง
   const data = fetchCasesAsArray('ALL'); 
+  const stats = getDashboardStats(viewMode, filterValue, filterAssignee, data);
+  let cases = [];
   
   if (data.length > 0) {
     const parseDate = (str) => {
@@ -934,6 +963,14 @@ function getDashboardStatsAndCases(viewMode, filterValue, filterAssignee) {
       } catch (e) { return null; }
     };
 
+    const nowObj = new Date();
+    const currentMonthKey = `${nowObj.getFullYear()}-${String(nowObj.getMonth() + 1).padStart(2, '0')}`;
+
+    const targetMonthsRaw = Array.isArray(filterValue) ? filterValue : (filterValue && filterValue !== 'all' ? [filterValue] : []);
+    const targetMonths = targetMonthsRaw.map(m => m === 'current_month' ? currentMonthKey : m);
+    
+    const targetAssignees = Array.isArray(filterAssignee) ? filterAssignee : (filterAssignee && filterAssignee !== 'all' ? [filterAssignee] : []);
+
     cases = data.filter(row => {
       const rawCreatedEffective = row[2];
       const assignee = row[6] ? row[6].trim() : 'Unassigned';
@@ -953,9 +990,11 @@ function getDashboardStatsAndCases(viewMode, filterValue, filterAssignee) {
       const rowDateKey = `${rowMonthKey}-${String(d.getDate()).padStart(2, '0')}`;
 
       let includeRow = true;
-      if (viewMode === 'day' && filterValue && rowDateKey !== filterValue) includeRow = false;
-      if (viewMode === 'month' && filterValue && filterValue !== 'all' && rowMonthKey !== filterValue) includeRow = false;
-      if (filterAssignee && filterAssignee !== 'all' && assignee !== filterAssignee) includeRow = false;
+      if (viewMode === 'day' && typeof filterValue === 'string' && filterValue && rowDateKey !== filterValue) includeRow = false;
+      if (viewMode === 'month' && targetMonths.length > 0 && !targetMonths.includes('all')) {
+          if (!targetMonths.includes(rowMonthKey)) includeRow = false;
+      }
+      if (targetAssignees.length > 0 && !targetAssignees.includes('all') && !targetAssignees.includes(assignee)) includeRow = false;
       
       return includeRow;
     }).map(row => ({
@@ -973,7 +1012,7 @@ function getDashboardStatsAndCases(viewMode, filterValue, filterAssignee) {
 // ------------------------------------------
 
 function analyzeTopicCasesWithAI(promptData) {
-  const API_KEY = 'AIzaSyAb8ZQdZPeuajdIOtWQlPtO0RV3_H-G8iQ'; 
+  const API_KEY = 'AIzaSyBaDckPTt4OD10laDq08MQgRMgBBKUapEk'; 
   
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
     return { success: false, message: 'กรุณาตั้งค่า API Key ของ Gemini ในไฟล์ Code.gs ก่อนใช้งานครับ' };
@@ -1038,7 +1077,7 @@ function analyzeTopicCasesWithAI(promptData) {
 }
 
 function analyzeCombinedStatsWithAI(promptData) {
-  const API_KEY = 'AIzaSyAb8ZQdZPeuajdIOtWQlPtO0RV3_H-G8iQ'; 
+  const API_KEY = 'AIzaSyBaDckPTt4OD10laDq08MQgRMgBBKUapEk'; 
   
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
     return { success: false, message: 'กรุณาตั้งค่า API Key ของ Gemini ในไฟล์ Code.gs ก่อนใช้งานครับ' };
