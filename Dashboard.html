@@ -14,6 +14,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- เพิ่มไลบรารี html2pdf สำหรับโหลด PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- 🌟 เพิ่ม SweetAlert2 สำหรับทำ Popup Loading -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <style>
     :root { 
@@ -79,6 +81,12 @@
     
     /* PDF Report Styles */
     .pdf-header { border-bottom: 2px solid var(--ci-primary); padding-bottom: 10px; margin-bottom: 20px; }
+    
+    /* Dropdown Checkboxes */
+    .dropdown-menu .form-check { margin-bottom: 0; padding-left: 2rem; cursor: pointer; }
+    .dropdown-menu .form-check-label { width: 100%; cursor: pointer; padding-top: 3px; padding-bottom: 3px; }
+    .dropdown-menu .form-check-input { cursor: pointer; }
+    .dropdown-menu li:hover { background-color: #f8f9fa; }
   </style>
 </head>
 <body class="p-4">
@@ -111,19 +119,37 @@
          <div class="vr mx-2"></div>
          <label class="fw-bold text-secondary mb-0"><i class="fas fa-filter me-2 text-primary"></i>ตัวกรอง:</label>
          
-         <div id="divMonthPicker">
-             <select id="filterMonth" class="form-select shadow-sm" style="width: auto; min-width: 150px;" onchange="loadDashboardData()">
-                <option value="all">📅 ทุกเดือน</option>
-             </select>
+         <div id="divMonthPicker" class="dropdown">
+             <button class="btn btn-white bg-white border shadow-sm dropdown-toggle fw-bold text-secondary" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" id="btnMonthDropdown">
+                📅 เลือกเดือน (เดือนปัจจุบัน)
+             </button>
+             <ul class="dropdown-menu p-2 shadow-sm" id="filterMonthMenu" style="max-height: 250px; overflow-y: auto; min-width: 200px;">
+                 <li><div class="form-check"><input class="form-check-input chk-month" type="checkbox" value="all" id="chk-month-all" onchange="handleAllCheckbox('chk-month')"><label class="form-check-label fw-bold" for="chk-month-all">ทุกเดือน</label></div></li>
+                 <li><div class="form-check"><input class="form-check-input chk-month" type="checkbox" value="current_month" id="chk-month-current" checked onchange="handleNormalCheckbox('chk-month')"><label class="form-check-label fw-bold text-primary" for="chk-month-current">เดือนปัจจุบัน</label></div></li>
+                 <li><hr class="dropdown-divider"></li>
+                 <!-- JS populated -->
+             </ul>
          </div>
 
          <div id="divDatePicker" class="d-none">
-             <input type="date" id="filterDate" class="form-control shadow-sm" onchange="loadDashboardData()">
+             <input type="date" id="filterDate" class="form-control shadow-sm">
          </div>
          
-         <select id="filterAssignee" class="form-select shadow-sm" style="width: auto; min-width: 200px;" onchange="loadDashboardData()">
-            <option value="all">👤 เจ้าหน้าที่ทุกคน</option>
-         </select>
+         <div class="dropdown">
+             <button class="btn btn-white bg-white border shadow-sm dropdown-toggle fw-bold text-secondary" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" id="btnAssigneeDropdown">
+                👤 เจ้าหน้าที่ (ทั้งหมด)
+             </button>
+             <ul class="dropdown-menu p-2 shadow-sm" id="filterAssigneeMenu" style="max-height: 250px; overflow-y: auto; min-width: 250px;">
+                 <li><div class="form-check"><input class="form-check-input chk-assignee" type="checkbox" value="all" id="chk-assignee-all" checked onchange="handleAllCheckbox('chk-assignee')"><label class="form-check-label fw-bold" for="chk-assignee-all">เจ้าหน้าที่ทุกคน</label></div></li>
+                 <li><hr class="dropdown-divider"></li>
+                 <!-- JS populated -->
+             </ul>
+         </div>
+
+         <!-- 🌟 ปุ่มดึงข้อมูลแยกออกมา เพื่อไม่ให้โหลดซ้ำซ้อนเวลาติ๊กหลายคน -->
+         <button class="btn btn-primary btn-sm rounded-pill fw-bold shadow-sm px-3 ms-2" onclick="loadDashboardData()">
+             <i class="fas fa-search me-1"></i> ประมวลผล
+         </button>
          
          <div class="ms-auto d-flex gap-2">
              <!-- Global AI Button -->
@@ -163,6 +189,18 @@
                 <h5 class="fw-bold text-secondary mb-3"><i class="fas fa-balance-scale me-2"></i>เปรียบเทียบผลงาน (<span id="compLabelRef"></span> vs <span id="compLabelSelected"></span>)</h5>
                 <div style="height: 250px; position: relative;">
                     <canvas id="compChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Top 10 Topics Row -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="chart-container">
+                <h5 class="fw-bold text-secondary mb-3"><i class="fas fa-trophy me-2 text-warning"></i>Top 10 หัวข้อที่ติดต่อบ่อยที่สุด</h5>
+                <div style="height: 300px; position: relative;">
+                    <canvas id="topTopicsChart"></canvas>
                 </div>
             </div>
         </div>
@@ -308,19 +346,17 @@
     let comparisonChart = null;
     let hourlyChart = null;
     let topicChart = null; 
+    let topTopicsChart = null;
     let topicModal = null;
-    let aiResultModal = null; // New Modal
+    let aiResultModal = null;
     
     // Global variables for export & AI
     let currentTopicData = []; 
     let currentTopicNameForExport = "";
     let currentDashboardStats = null; 
     let currentFilteredCases = []; 
-    let currentReportTitleForPDF = "AI_Analysis_Report"; // ชื่อไฟล์ PDF เริ่มต้น
+    let currentReportTitleForPDF = "AI_Analysis_Report";
 
-    /**
-     * Sanitization Helper
-     */
     function h(str) {
         if (str === null || str === undefined) return '';
         return String(str).replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
@@ -328,6 +364,7 @@
 
     window.onload = function() {
         toggleViewMode(); 
+        loadDashboardData(); // 🌟 โหลดครั้งแรกตอนเปิดหน้าเว็บ
         initTooltips();
         topicModal = new bootstrap.Modal(document.getElementById('topicModal'));
         aiResultModal = new bootstrap.Modal(document.getElementById('aiResultModal'));
@@ -336,6 +373,77 @@
     function initTooltips() {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map(function (t) { return new bootstrap.Tooltip(t); });
+    }
+
+    // --- Checkboxes Management Logic ---
+    function handleAllCheckbox(className) {
+        const allBox = document.getElementById(`${className}-all`);
+        const boxes = document.querySelectorAll(`.${className}:not(#${className}-all)`);
+        if (allBox.checked) {
+            boxes.forEach(b => b.checked = false);
+        } else {
+            allBox.checked = true; 
+        }
+        updateDropdownLabel(className);
+        // 🌟 เอา loadDashboardData() ออก เพื่อรอให้กดปุ่ม "ประมวลผล" ทีเดียว
+    }
+
+    function handleNormalCheckbox(className) {
+        const allBox = document.getElementById(`${className}-all`);
+        const boxes = document.querySelectorAll(`.${className}:not(#${className}-all)`);
+        const anyChecked = Array.from(boxes).some(b => b.checked);
+        if (anyChecked) {
+            allBox.checked = false;
+        } else {
+            allBox.checked = true;
+        }
+        updateDropdownLabel(className);
+        // 🌟 เอา loadDashboardData() ออก เพื่อรอให้กดปุ่ม "ประมวลผล" ทีเดียว
+    }
+
+    function getSelectedCheckboxValues(className) {
+        const allBox = document.getElementById(`${className}-all`);
+        if (allBox && allBox.checked) return ['all'];
+        const boxes = document.querySelectorAll(`.${className}:not(#${className}-all):checked`);
+        return Array.from(boxes).map(b => b.value);
+    }
+
+    function updateDropdownLabel(className) {
+        const allBox = document.getElementById(`${className}-all`);
+        let labelBtn = className === 'chk-month' ? document.getElementById('btnMonthDropdown') : document.getElementById('btnAssigneeDropdown');
+        let prefix = className === 'chk-month' ? '📅 เลือกเดือน' : '👤 เจ้าหน้าที่';
+        
+        if (allBox && allBox.checked) {
+            labelBtn.innerHTML = `${prefix} (ทั้งหมด)`;
+        } else {
+            const checkedBoxes = document.querySelectorAll(`.${className}:not(#${className}-all):checked`);
+            if (className === 'chk-month' && checkedBoxes.length === 1 && checkedBoxes[0].value === 'current_month') {
+                labelBtn.innerHTML = `${prefix} (เดือนปัจจุบัน)`;
+            } else {
+                labelBtn.innerHTML = `${prefix} (${checkedBoxes.length} รายการ)`;
+            }
+        }
+    }
+
+    function resetFilters() {
+        document.getElementById('viewMode').value = 'month';
+        
+        const allMonthBox = document.getElementById('chk-month-all');
+        if (allMonthBox) allMonthBox.checked = false;
+        
+        const currentMonthBox = document.getElementById('chk-month-current');
+        if (currentMonthBox) currentMonthBox.checked = true;
+        
+        document.querySelectorAll('.chk-month:not(#chk-month-all):not(#chk-month-current)').forEach(b => b.checked = false);
+        
+        const allAssigneeBox = document.getElementById('chk-assignee-all');
+        if (allAssigneeBox) allAssigneeBox.checked = true;
+        document.querySelectorAll('.chk-assignee:not(#chk-assignee-all)').forEach(b => b.checked = false);
+        
+        updateDropdownLabel('chk-month');
+        updateDropdownLabel('chk-assignee');
+        toggleViewMode();
+        loadDashboardData(); // 🌟 รีเซ็ตแล้วให้โหลดข้อมูลใหม่ทันที
     }
 
     function toggleViewMode() {
@@ -362,20 +470,39 @@
             compContainer.classList.remove('d-none');
             topicHint.classList.remove('d-none');
         }
-        loadDashboardData();
+        // 🌟 เอา loadDashboardData() ออก เพื่อรอให้กดปุ่ม "ประมวลผล"
     }
 
     function loadDashboardData() {
+        // 🌟 เพิ่ม Popup Loading Animation ด้วย SweetAlert2 ตรงนี้
+        Swal.fire({
+            title: 'กำลังประมวลผลข้อมูล...',
+            html: 'กรุณารอสักครู่ ระบบกำลังจัดเตรียมสถิติ',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
         const mode = document.getElementById('viewMode').value;
-        const assignee = document.getElementById('filterAssignee').value;
-        let value = (mode === 'month') ? document.getElementById('filterMonth').value : document.getElementById('filterDate').value;
+        const assignee = getSelectedCheckboxValues('chk-assignee');
+        let value = (mode === 'month') ? getSelectedCheckboxValues('chk-month') : document.getElementById('filterDate').value;
 
         document.getElementById('teamTableBody').innerHTML = `<tr><td colspan="6" class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>กำลังคำนวณสถิติ...</td></tr>`;
         document.getElementById('statOpenAccept').innerHTML = '<span class="fs-4 text-muted">...</span>';
         document.getElementById('statAcceptClose').innerHTML = '<span class="fs-4 text-muted">...</span>';
         document.getElementById('btnGlobalAI').style.display = 'none';
         
-        google.script.run.withSuccessHandler(renderDashboard).getDashboardStatsAndCases(mode, value, assignee);
+        google.script.run
+            .withSuccessHandler(res => {
+                Swal.close(); // 🌟 ปิด Popup เมื่อโหลดสำเร็จ
+                renderDashboard(res);
+            })
+            .withFailureHandler(err => {
+                Swal.close(); // 🌟 ปิด Popup เมื่อเกิดข้อผิดพลาด
+                Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
+            })
+            .getDashboardStatsAndCases(mode, value, assignee);
     }
 
     function renderDashboard(data) {
@@ -389,18 +516,18 @@
         document.getElementById('statOpenAccept').textContent = data.stats.avgOpenAccept;
         document.getElementById('statAcceptClose').textContent = data.stats.avgAcceptClose;
 
-        const mSelect = document.getElementById('filterMonth');
-        if (mSelect.options.length <= 1) {
-            data.stats.filterOptions.months.forEach(m => {
-                const opt = document.createElement('option'); opt.value = m; opt.textContent = m;
-                mSelect.appendChild(opt);
+        // Populate Checkbox Menus once
+        const mMenu = document.getElementById('filterMonthMenu');
+        if (mMenu.children.length <= 3) {
+            data.stats.filterOptions.months.forEach((m, idx) => {
+                mMenu.innerHTML += `<li><div class="form-check"><input class="form-check-input chk-month" type="checkbox" value="${m}" id="chk-m-${idx}" onchange="handleNormalCheckbox('chk-month')"><label class="form-check-label" for="chk-m-${idx}">${m}</label></div></li>`;
             });
         }
-        const aSelect = document.getElementById('filterAssignee');
-        if (aSelect.options.length <= 1) {
-            data.stats.filterOptions.assignees.forEach(a => {
-                const opt = document.createElement('option'); opt.value = a.email; opt.textContent = a.label;
-                aSelect.appendChild(opt);
+        
+        const aMenu = document.getElementById('filterAssigneeMenu');
+        if (aMenu.children.length <= 2) {
+            data.stats.filterOptions.assignees.forEach((a, idx) => {
+                aMenu.innerHTML += `<li><div class="form-check"><input class="form-check-input chk-assignee" type="checkbox" value="${a.email}" id="chk-a-${idx}" onchange="handleNormalCheckbox('chk-assignee')"><label class="form-check-label" for="chk-a-${idx}">${h(a.label)}</label></div></li>`;
             });
         }
 
@@ -446,12 +573,12 @@
         }
 
         renderTopicChart(data.stats.topicStats);
+        renderTopTopicsChart(data.stats.topicStats);
         renderPerformanceGraph(data.stats.comparisonData, data.stats.refLabel);
         renderHourlyChart(data.stats.hourlyStats); 
         initTooltips();
     }
 
-    // *** Global AI Analysis Function (เรียกใช้ผ่าน Modal Popup) ***
     function triggerGlobalAIAnalysis() {
         if (!currentDashboardStats || !currentFilteredCases) return;
 
@@ -475,33 +602,27 @@
         let casesWithDetails = currentFilteredCases.filter(c => c.actionDetails && c.actionDetails.trim() !== '');
         
         if (casesWithDetails.length > 0) {
-            // ดึงข้อมูลไปวิเคราะห์ทั้งหมดไม่จำกัดด้วย slice() 
             casesWithDetails.forEach((c) => {
                 let subTopicsStr = "ไม่ระบุ";
                 try {
                     const tObj = JSON.parse(c.topic);
                     if(tObj && tObj.sub && tObj.sub.length > 0) subTopicsStr = tObj.sub.join(", ");
                 } catch(e) {}
-                // ส่งรหัส [CASE-XXXX] ไปให้ AI เห็นชัดๆ
                 dataStr += `[${c.id}]: ปัญหาย่อย="${subTopicsStr}", สิ่งที่แอดมินพิมพ์="${c.actionDetails}", สถานะ="${c.status}"\n`;
             });
         } else { dataStr += "- (ยังไม่มีเจ้าหน้าที่ลงบันทึกใดๆ ในช่วงเวลานี้)\n"; }
 
-        // Setup PDF Title
         const mode = document.getElementById('viewMode').value;
-        const val = mode === 'month' ? document.getElementById('filterMonth').value : document.getElementById('filterDate').value;
+        const val = mode === 'month' ? getSelectedCheckboxValues('chk-month').join('-') : document.getElementById('filterDate').value;
         currentReportTitleForPDF = `Global_Analysis_${val}`;
 
-        // เตรียมความพร้อม Modal ก่อนโชว์
         document.getElementById('btnDownloadPDF').style.display = 'none';
         document.getElementById('pdfReportHeader').classList.add('d-none');
         document.getElementById('pdfReportFooter').classList.add('d-none');
         document.getElementById('aiResultTextPopup').innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x mb-3 text-warning"></i><br>Gemini AI กำลังวิเคราะห์สถิติและคุณภาพงานของทีม<br>อาจใช้เวลา 5-10 วินาที...</div>';
         
-        // Show Modal
         aiResultModal.show();
 
-        // ฝั่งปุ่มที่กด ให้หมุน Loading ไว้ด้วยเผื่อผู้ใช้ปิด Modal ระหว่างทาง
         const btn = document.getElementById('btnGlobalAI');
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> กำลังวิเคราะห์...';
@@ -511,17 +632,14 @@
             btn.innerHTML = '<i class="fas fa-magic text-dark me-1"></i> วิเคราะห์ภาพรวมเจาะลึก (AI)';
             
             if (res.success) {
-                // แปลงสัญลักษณ์ ** เป็นตัวหนา และแปลง \n เป็นแท็ก <br>
                 let formattedText = res.text
                     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
                     .replace(/\n/g, '<br>');
                 document.getElementById('aiResultTextPopup').innerHTML = formattedText;
                 
-                // เซ็ตข้อความให้หน้า Report PDF
                 const todayStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 document.getElementById('pdfReportDate').textContent = `ข้อมูลประจำรอบ: ${val} | เวลาพิมพ์รายงาน: ${todayStr}`;
                 
-                // Show elements for PDF Download
                 document.getElementById('btnDownloadPDF').style.display = 'block';
                 document.getElementById('pdfReportHeader').classList.remove('d-none');
                 document.getElementById('pdfReportFooter').classList.remove('d-none');
@@ -532,30 +650,24 @@
         }).analyzeCombinedStatsWithAI(dataStr);
     }
 
-    // *** Topic AI Analysis Function (เรียกใช้ผ่าน Modal Popup) ***
     function triggerTopicAIAnalysis() {
         if (!currentTopicData || currentTopicData.length === 0) return;
 
         let dataStr = `หัวข้อหลักที่กำลังวิเคราะห์: ${currentTopicNameForExport}\n\n`;
         
-        // ดึงข้อมูลไปวิเคราะห์ทั้งหมดไม่จำกัดด้วย slice()
         currentTopicData.forEach((r) => { 
-            // ส่งรหัส [CASE-XXXX] ให้เห็นชัดๆ
             dataStr += `[${r.id}]: ปัญหาย่อย="${r.subTopic}", สิ่งที่จนท.ทำ="${r.lastAction}", สถานะ="${r.status}"\n`;
         });
 
-        // Setup PDF Title
         const dateVal = document.getElementById('filterDate').value;
         const safeTopicName = currentTopicNameForExport.replace(/[/\\?%*:|"<>]/g, '-');
         currentReportTitleForPDF = `Topic_Analysis_${safeTopicName}_${dateVal}`;
 
-        // เตรียมความพร้อม Modal ก่อนโชว์
         document.getElementById('btnDownloadPDF').style.display = 'none';
         document.getElementById('pdfReportHeader').classList.add('d-none');
         document.getElementById('pdfReportFooter').classList.add('d-none');
         document.getElementById('aiResultTextPopup').innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x mb-3 text-warning"></i><br>Gemini AI กำลังวิเคราะห์หัวข้อเคสและการตอบสนอง<br>อาจใช้เวลา 5-10 วินาที...</div>';
         
-        // Show AI Modal (ทับ Topic Modal ไปเลย หรืออยู่ด้านบน)
         aiResultModal.show();
 
         const btn = document.getElementById('btnAnalyzeAI');
@@ -567,17 +679,14 @@
             btn.innerHTML = '<i class="fas fa-magic text-dark me-1"></i> วิเคราะห์ด้วย AI';
             
             if (res.success) {
-                // แปลงสัญลักษณ์ ** เป็นตัวหนา และแปลง \n เป็นแท็ก <br>
                 let formattedText = res.text
                     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
                     .replace(/\n/g, '<br>');
                 document.getElementById('aiResultTextPopup').innerHTML = formattedText;
                 
-                // เซ็ตข้อความให้หน้า Report PDF
                 const todayStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 document.getElementById('pdfReportDate').textContent = `หัวข้อ: ${currentTopicNameForExport} | ข้อมูลประจำวันที่: ${dateVal} | เวลาพิมพ์รายงาน: ${todayStr}`;
                 
-                // Show elements for PDF Download
                 document.getElementById('btnDownloadPDF').style.display = 'block';
                 document.getElementById('pdfReportHeader').classList.remove('d-none');
                 document.getElementById('pdfReportFooter').classList.remove('d-none');
@@ -588,28 +697,23 @@
         }).analyzeTopicCasesWithAI(dataStr);
     }
 
-    // *** ฟังก์ชันแปลงหน้าจอเป็น PDF (ใหม่!) ***
     function downloadAIPDF() {
         const btn = document.getElementById('btnDownloadPDF');
         const originalHtml = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> กำลังสร้างไฟล์...';
         btn.disabled = true;
 
-        // เป้าหมายคือการวาด element ที่มี id ว่า pdfContentArea
         const element = document.getElementById('pdfContentArea');
         
-        // กำหนดตั้งค่าหน้า PDF
         const opt = {
-            margin:       [0.5, 0.5, 0.5, 0.5], // นิ้ว
+            margin:       [0.5, 0.5, 0.5, 0.5], 
             filename:     `${currentReportTitleForPDF}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true }, // scale ยิ่งเยอะยิ่งชัด แต่ไฟล์ใหญ่ขึ้น
+            html2canvas:  { scale: 2, useCORS: true },
             jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
 
-        // สั่งสร้างและดาวน์โหลดไฟล์
         html2pdf().set(opt).from(element).save().then(() => {
-            // โหลดเสร็จคืนค่าปุ่มกลับมา
             btn.innerHTML = originalHtml;
             btn.disabled = false;
         }).catch(err => {
@@ -644,7 +748,17 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'right' }
+                    legend: { position: 'right' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let value = context.raw || 0;
+                                let total = context.chart._metasets[context.datasetIndex].total;
+                                let percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                                return ` ${context.label}: ${percentage} (${value} เคส)`;
+                            }
+                        }
+                    }
                 },
                 cutout: '60%',
                 onClick: (evt, elements) => {
@@ -653,6 +767,40 @@
                         const label = labels[index];
                         handleTopicClick(label);
                     }
+                }
+            }
+        });
+    }
+
+    function renderTopTopicsChart(topicStats) {
+        const ctx = document.getElementById('topTopicsChart').getContext('2d');
+        if (topTopicsChart) topTopicsChart.destroy();
+        
+        if (!topicStats || topicStats.length === 0) return;
+
+        const top10 = topicStats.slice(0, 10);
+        const labels = top10.map(t => t.label);
+        const values = top10.map(t => t.count);
+
+        topTopicsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'จำนวนเคส',
+                    data: values,
+                    backgroundColor: 'rgba(49, 193, 215, 0.8)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Makes it horizontal
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    x: { beginAtZero: true, ticks: { precision: 0 } },
+                    y: { ticks: { autoSkip: false } }
                 }
             }
         });
@@ -814,15 +962,18 @@
     function renderPerformanceGraph(compData, refLabel) {
         const container = document.getElementById('comparisonContainer');
         const mode = document.getElementById('viewMode').value;
-        const value = (mode === 'month') ? document.getElementById('filterMonth').value : document.getElementById('filterDate').value;
         
-        if (!compData || value === 'all' || !value) { 
+        // Handling for Arrays
+        const mValues = getSelectedCheckboxValues('chk-month');
+        let displayValue = (mode === 'month') ? mValues.join(', ') : document.getElementById('filterDate').value;
+        
+        if (!compData || mValues.includes('all') || !displayValue) { 
             container.classList.add('d-none'); 
             return; 
         }
         
         container.classList.remove('d-none');
-        document.getElementById('compLabelSelected').textContent = value;
+        document.getElementById('compLabelSelected').textContent = displayValue.length > 20 ? displayValue.substring(0,20)+'...' : displayValue;
         document.getElementById('compLabelRef').textContent = refLabel;
 
         const ctx = document.getElementById('compChart').getContext('2d');
@@ -831,7 +982,7 @@
         comparisonChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [refLabel, value],
+                labels: [refLabel, displayValue.length > 20 ? displayValue.substring(0,20)+'...' : displayValue],
                 datasets: [
                     { 
                         label: 'งานทั้งหมด', 
@@ -869,13 +1020,6 @@
                 }
             }
         });
-    }
-
-    function resetFilters() {
-        document.getElementById('viewMode').value = 'month';
-        document.getElementById('filterMonth').value = 'all';
-        document.getElementById('filterAssignee').value = 'all';
-        toggleViewMode();
     }
   </script>
 </body>
